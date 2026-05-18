@@ -17,11 +17,12 @@ export const LoginPage: React.FC = () => {
   }
 
   const roleOptions = [
-    { label: 'Head Office (HO)', role: Role.HO, email: 'ho@hometown.in', description: 'National oversight, analytics, and admin', icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: 'Store CSD', role: Role.STORE_MANAGER, email: 'store@hometown.in', description: 'Store grievance handling & ticket creation', icon: Store, color: 'text-orange-600', bg: 'bg-orange-50' },
-    { label: 'Warehouse Ops', role: Role.WAREHOUSE, email: 'warehouse@hometown.in', description: 'Inventory management & stock status', icon: Package, color: 'text-purple-600', bg: 'bg-purple-50' },
-    { label: 'Delivery Agent', role: Role.DELIVERY, email: 'delivery@hometown.in', description: 'On-ground dispatch & POD capture', icon: Truck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'Fitter / Installation', role: Role.FITTER, email: 'fitter@hometown.in', description: 'Technical job completion & schedules', icon: Wrench, color: 'text-rose-600', bg: 'bg-rose-50' },
+    { label: 'Head Office (HO)', role: Role.ADMIN, email: 'kailash.vaishanv@praxisretail.in', description: 'National oversight, analytics, and admin', icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Store CSD', role: Role.SERVICE_MANAGER, email: 'htcsd.siliguri@praxisretail.in', description: 'Store grievance handling & ticket creation', icon: Store, color: 'text-orange-600', bg: 'bg-orange-50' },
+    { label: 'Delivery Agent', role: Role.DELIVERY, email: 'munna.kumar@demo.com', description: 'On-ground dispatch & POD capture', icon: Truck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { label: 'Fitter / Installation', role: Role.FITTER, email: 'mukesh.kumar@demo.com', description: 'Technical job completion & schedules', icon: Wrench, color: 'text-rose-600', bg: 'bg-rose-50' },
+    { label: 'Warehouse Ops', role: Role.WAREHOUSE, email: 'rana.ranjit@praxisretail.in', description: 'Inventory management & stock status', icon: Package, color: 'text-purple-600', bg: 'bg-purple-50' },
+
   ];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -43,7 +44,7 @@ export const LoginPage: React.FC = () => {
 
   const fillCredentials = (opt: typeof roleOptions[0]) => {
     setEmail(opt.email);
-    setPassword('password123');
+    setPassword('Password@123');
     setError(null);
   };
 

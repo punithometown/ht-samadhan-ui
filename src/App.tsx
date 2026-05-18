@@ -14,12 +14,17 @@ import { TicketDetail } from './pages/TicketDetail';
 import { UserManagement } from './pages/UserManagement';
 import { TATAnalysis } from './pages/TATAnalysis';
 import { DeliveryManagement } from './pages/DeliveryManagement';
-import { DeliveryAgentTasks } from './pages/delivery/DeliveryAgentTasks';
+import { DeliveryAgentTasksList } from './pages/delivery/DeliveryAgentTasksList';
 import { FittingManagement } from './pages/FittingManagement';
-import { FitterManagement } from './pages/FitterManagement';
-import { FitterTasks } from './pages/fitter/FitterTasks';
+import { FitterTasksList } from './pages/fitter/FitterTasks';
 import { WarehouseRequests } from './pages/WarehouseRequests';
 import { PlaceholderPage } from './pages/Placeholder';
+import { DeliveryAssignment } from './pages/DeliveryAssignment';
+import { FittingAssignment } from './pages/FittingAssignment';
+import { FitterTaskDetail } from './pages/fitter/FitterTaskDetail';
+import { DeliveryTaskUpdate } from './pages/delivery/DeliveryTaskUpdate';
+
+
 
 export default function App() {
   return (
@@ -34,8 +39,14 @@ export default function App() {
             <Route path="/tickets/new" element={<CreateTicket />} />
             <Route path="/tickets/:id" element={<TicketDetail />} />
             <Route path="/deliveries" element={<DeliveryManagement />} />
+            <Route path="/delivery-assign/:ticketId" element={<DeliveryAssignment />} />
+            <Route path="/delivery-task/:id" element={<DeliveryTaskUpdate />} />
+
+
             <Route path="/fittings" element={<FittingManagement />} />
-            <Route path="/fitters" element={<FitterManagement />} />
+            <Route path="/fitting-assign/:ticketId" element={<FittingAssignment />} />
+            <Route path="/fitter-task/:id" element={<FitterTaskDetail />} />
+
             <Route path="/tat-analysis" element={<TATAnalysis />} />
             <Route path="/warehouse/picks" element={<WarehouseRequests />} />
             <Route path="/performance" element={<PlaceholderPage title="Store Performance Analytics" />} />
@@ -44,14 +55,14 @@ export default function App() {
             <Route path="/inventory/pickups" element={<PlaceholderPage title="Pending Pickups" />} />
             <Route path="/inventory/status" element={<PlaceholderPage title="Stock Inventory Status" />} />
             <Route path="/dispatch" element={<PlaceholderPage title="Dispatch List" />} />
-            <Route path="/delivery/tasks" element={<DeliveryAgentTasks />} />
+            <Route path="/delivery/tasks" element={<DeliveryAgentTasksList />} />
             <Route path="/delivery/map" element={<PlaceholderPage title="Smart Route Planner" />} />
             <Route path="/delivery/pod" element={<PlaceholderPage title="Digital Proof of Delivery" />} />
-            <Route path="/fitter/tasks" element={<FitterTasks />} />
+            <Route path="/fitter/tasks" element={<FitterTasksList />} />
             <Route path="/fitter/jobs" element={<PlaceholderPage title="Installation Job List" />} />
             <Route path="/fitter/schedule" element={<PlaceholderPage title="Job Schedule" />} />
             <Route path="/fitter/status" element={<PlaceholderPage title="Job Completion Reports" />} />
-            
+
             {/* Catch all internal dashboard routes */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Route>

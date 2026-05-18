@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Role } from '../types';
+import { API_BASE_URL } from '../config/api';
+
 
 interface AuthContextType {
   user: User | null;
@@ -9,14 +11,6 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const VALID_USERS = [
-  { email: 'ho@hometown.in', password: 'password123', name: 'HO Administrator', role: Role.HO, location: 'Central HO' },
-  { email: 'store@hometown.in', password: 'password123', name: 'Mumbai Store Lead', role: Role.STORE_CSD, location: 'Mumbai Worli' },
-  { email: 'warehouse@hometown.in', password: 'password123', name: 'Logistics Head', role: Role.WAREHOUSE, location: 'Bhiwandi Hub' },
-  { email: 'delivery@hometown.in', password: 'password123', name: 'Delivery Supervisor', role: Role.DELIVERY, location: 'Mumbai Hub' },
-  { email: 'fitter@hometown.in', password: 'password123', name: 'Technical Head', role: Role.FITTER, location: 'Field Services' },
-];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -31,24 +25,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      // POST request to your authentication endpoint
+      const response = await fetch(`${API_BASE_URL}/users/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
-    const validUser = VALID_USERS.find(u => u.email === email && u.password === password);
+      const result = await response.json();
 
-    if (validUser) {
-      const authUser: User = {
-        id: Math.random().toString(36).substr(2, 9),
-        name: validUser.name,
-        role: validUser.role,
-        email: validUser.email,
-        location: validUser.location
-      };
-      setUser(authUser);
-      localStorage.setItem('hometown_user', JSON.stringify(authUser));
-      return true;
+      // Expecting a response like: { success: true, data: { _id, name, role, email, location, siteId, ... } }
+      if (result.success && result.data) {
+        const userData = result.data;
+        const authUser: User = {
+          id: userData._id,
+          name: userData.name,
+          role: userData.role,
+          email: userData.email,
+          location: userData.location,
+          siteId: userData.siteId,
+        };
+        setUser(authUser);
+        localStorage.setItem('hometown_user', JSON.stringify(authUser));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
     }
-    return false;
   };
 
   const logout = () => {

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Truck, 
   Search, 
@@ -9,93 +10,187 @@ import {
   ChevronRight,
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
+
+import { API_BASE_URL } from '../config/api';
+
 
 interface DeliveryTicket {
-  id: string;
-  customer: string;
+  _id: string;
+  ticketNumber: string;
+  customerName?: string;
+  customerMobile: string;
   address: string;
   orderId: string;
-  status: 'Pending' | 'Assigned' | 'Out for Delivery' | 'Delivered';
-  agent: string | null;
-  date: string;
+  status: string;
+  assignedTo?: string;
+  createdAt: string;
   priority: 'Normal' | 'High';
+  site: string;
 }
 
 export const DeliveryManagement: React.FC = () => {
+  const navigate = useNavigate();
+  const [tickets, setTickets] = useState<DeliveryTicket[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState('All');
-  const [showAssignModal, setShowAssignModal] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const deliveries: DeliveryTicket[] = [
-    { id: 'DEL-1021', customer: 'Anjali Verma', address: 'Bandra West, Mumbai', orderId: 'HT-5021', status: 'Pending', agent: null, date: '2026-05-13', priority: 'High' },
-    { id: 'DEL-1022', customer: 'Rajesh Kumar', address: 'Worli Sea Face, Mumbai', orderId: 'HT-5022', status: 'Assigned', agent: 'Suresh L.', date: '2026-05-13', priority: 'Normal' },
-    { id: 'DEL-1023', customer: 'Meera Shah', address: 'Juhu Tara Road, Mumbai', orderId: 'HT-5023', status: 'Out for Delivery', agent: 'Ramesh K.', date: '2026-05-13', priority: 'High' },
-    { id: 'DEL-1024', customer: 'Karan Mehra', address: 'Andheri East, Mumbai', orderId: 'HT-5024', status: 'Pending', agent: null, date: '2026-05-14', priority: 'Normal' },
-  ];
+  // Helper: format address from serviceAddress object (if available)
+  const formatAddress = (ticket: any): string => {
+    if (ticket.serviceAddress) {
+      const { line1, city, state, pincode } = ticket.serviceAddress;
+      return [line1, city, state, pincode].filter(Boolean).join(', ');
+    }
+    return ticket.site || 'Address not provided';
+  };
 
-  const agents = ['Suresh L.', 'Ramesh K.', 'Vijay P.', 'Manoj S.'];
+  // Fetch tickets with status = ASSIGNED_TO_DELIVERY
+  useEffect(() => {
+    const fetchTickets = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`${API_BASE_URL}/tickets`);
+        const data = await response.json();
+
+        if (!data.success || !Array.isArray(data.data)) {
+          throw new Error('Failed to fetch tickets');
+        }
+
+        // Filter only ASSIGNED_TO_DELIVERY
+        const deliveryTickets = data.data
+          .filter((t: any) => t.status === 'OPEN' && t.type === 'Installation' && t.isDelivery == false)
+          .map((t: any) => ({
+            _id: t._id,
+            ticketNumber: t.ticketNumber,
+            customerName: t.customerName || t.customerMobile,
+            customerMobile: t.customerMobile,
+            address: formatAddress(t),
+            orderId: t.productDetails?.orderId || 'N/A',
+            status: t.status,
+            assignedTo: t.assignedTo,
+            createdAt: t.createdAt,
+            priority: t.type === 'Complaint' ? 'High' : 'Normal',
+            site: t.site,
+          }));
+
+        setTickets(deliveryTickets);
+      } catch (err) {
+        console.error(err);
+        setError('Unable to load data. Please check the server.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTickets();
+  }, []);
+
+  const filteredTickets = tickets.filter(ticket => {
+    const matchesStatus = filterStatus === 'All' || ticket.status === filterStatus;
+    const matchesSearch = 
+      ticket.ticketNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (ticket.customerName && ticket.customerName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      ticket.customerMobile.includes(searchQuery);
+    return matchesStatus && matchesSearch;
+  });
 
   const getStatusStyle = (status: string) => {
     switch(status) {
-      case 'Pending': return 'bg-orange-50 text-orange-600 border-orange-100';
-      case 'Assigned': return 'bg-blue-50 text-blue-600 border-blue-100';
-      case 'Out for Delivery': return 'bg-purple-50 text-purple-600 border-purple-100';
-      case 'Delivered': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+      case 'ASSIGNED_TO_DELIVERY': return 'bg-cyan-50 text-cyan-600 border-cyan-100';
       default: return 'bg-slate-50 text-slate-600 border-slate-100';
     }
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+        <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-3" />
+        <p className="text-red-700">{error}</p>
+        <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-100 rounded-lg text-xs font-bold">
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const stats = [
+    { label: 'Ready for Dispatch', value: tickets.length, icon: Truck, color: 'text-cyan-600' },
+    { label: 'Pending Scheduling', value: tickets.filter(t => !t.assignedTo).length, icon: Clock, color: 'text-amber-600' },
+  ];
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Logistics & Last Mile</h3>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Delivery Dispatch</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm flex items-center gap-3">
-            <Filter size={14} className="text-slate-400" />
-            <select 
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="bg-transparent text-xs font-bold text-slate-700 outline-none appearance-none pr-6"
-            >
-              <option value="All">All Deliveries</option>
-              <option value="Pending">Pending</option>
-              <option value="Assigned">Assigned</option>
-              <option value="Out for Delivery">In Transit</option>
-            </select>
-          </div>
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Unassigned', value: '12', icon: AlertCircle, color: 'text-orange-600' },
-          { label: 'In Transit', value: '8', icon: Truck, color: 'text-blue-600' },
-          { label: 'Completed', value: '45', icon: CheckCircle2, color: 'text-emerald-600' },
-          { label: 'Pending POD', value: '3', icon: Clock, color: 'text-purple-600' },
-        ].map((stat, i) => (
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {stats.map((stat, i) => (
           <div key={i} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-             <div className={`p-2 rounded-lg bg-slate-50 ${stat.color}`}>
-               <stat.icon size={20} />
-             </div>
-             <div>
-               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</p>
-               <h4 className="text-xl font-black text-slate-900">{stat.value}</h4>
-             </div>
+            <div className={`p-2 rounded-lg bg-slate-50 ${stat.color}`}>
+              <stat.icon size={20} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</p>
+              <h4 className="text-xl font-black text-slate-900">{stat.value}</h4>
+            </div>
           </div>
         ))}
       </div>
 
+      {/* Search & Filter */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center gap-3">
+          <Search size={18} className="text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by Ticket #, Customer Name or Mobile..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 bg-transparent text-sm outline-none"
+          />
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm flex items-center gap-3">
+          <Filter size={14} className="text-slate-400" />
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="bg-transparent text-xs font-bold text-slate-700 outline-none appearance-none pr-6"
+          >
+            <option value="All">All Deliveries</option>
+            <option value="ASSIGNED_TO_DELIVERY">Assigned to Delivery</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Tickets Table */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50/50">
               <tr className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">
-                <th className="px-6 py-5">Delivery ID</th>
+                <th className="px-6 py-5">Ticket ID</th>
                 <th className="px-6 py-5">Customer & Destination</th>
                 <th className="px-6 py-5">Order Details</th>
                 <th className="px-6 py-5">Status</th>
@@ -104,105 +199,67 @@ export const DeliveryManagement: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {deliveries.map((del) => (
-                <tr key={del.id} className="hover:bg-slate-50/50 transition-colors group">
+              {filteredTickets.map((ticket) => (
+                <tr key={ticket._id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                       {del.priority === 'High' && <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />}
-                       <span className="font-mono text-xs font-bold text-slate-900">{del.id}</span>
+                      {ticket.priority === 'High' && <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />}
+                      <span className="font-mono text-xs font-bold text-slate-900">{ticket.ticketNumber}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-xs font-bold text-slate-800">{del.customer}</p>
+                    <p className="text-xs font-bold text-slate-800">{ticket.customerName}</p>
                     <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
                       <MapPin size={10} />
-                      {del.address}
+                      {ticket.address}
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-xs font-medium text-slate-600">Order: <span className="font-bold text-slate-900">{del.orderId}</span></p>
+                    <p className="text-xs font-medium text-slate-600">Order: <span className="font-bold text-slate-900">{ticket.orderId}</span></p>
                     <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
                       <Calendar size={10} />
-                      {del.date}
+                      {formatDate(ticket.createdAt)}
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${getStatusStyle(del.status)}`}>
-                      {del.status}
+                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border ${getStatusStyle(ticket.status)}`}>
+                      Dispatch Ready
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    {del.agent ? (
+                    {ticket.assignedTo ? (
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center text-slate-500">
                           <User size={12} />
                         </div>
-                        <span className="text-xs font-medium text-slate-700">{del.agent}</span>
+                        <span className="text-xs font-medium text-slate-700">{ticket.assignedTo}</span>
                       </div>
                     ) : (
-                      <span className="text-[10px] font-bold text-slate-400 italic">Unassigned</span>
+                      <span className="text-[10px] font-bold text-slate-400 italic">Not assigned</span>
                     )}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button 
-                      onClick={() => setShowAssignModal(del.id)}
-                      className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-sm"
+                    <button
+                      onClick={() => navigate(`/delivery-assign/${ticket._id}`)}
+                      className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-sm flex items-center gap-1 ml-auto"
                     >
-                      {del.agent ? 'Reassign' : 'Assign Agent'}
+                      <Truck size={12} />
+                      Schedule Dispatch
                     </button>
                   </td>
                 </tr>
               ))}
+              {filteredTickets.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="text-center py-12 text-slate-500 text-sm">
+                    No tickets ready for dispatch.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
-
-      {/* Assignment Modal (Simple Simulation) */}
-      <AnimatePresence>
-        {showAssignModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowAssignModal(null)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
-            >
-              <div className="p-6 border-b border-slate-100">
-                <h3 className="text-xl font-black text-slate-900">Dispatch Assignment</h3>
-                <p className="text-xs text-slate-400 font-medium">Selecting available delivery agent for {showAssignModal}</p>
-              </div>
-              <div className="p-6 space-y-3">
-                {agents.map((agent) => (
-                  <button 
-                    key={agent}
-                    onClick={() => setShowAssignModal(null)}
-                    className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-orange-50 border border-slate-100 hover:border-orange-200 rounded-xl transition-all group"
-                  >
-                    <div className="flex items-center gap-3">
-                       <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-slate-200 text-slate-400 group-hover:text-orange-500 transition-colors">
-                         <User size={18} />
-                       </div>
-                       <div className="text-left">
-                         <p className="text-sm font-bold text-slate-800">{agent}</p>
-                         <p className="text-[10px] text-slate-400 uppercase tracking-widest">Available • 4 Active Tasks</p>
-                       </div>
-                    </div>
-                    <ChevronRight size={16} className="text-slate-300 group-hover:text-orange-500" />
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

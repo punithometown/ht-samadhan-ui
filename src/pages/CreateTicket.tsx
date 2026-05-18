@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, Layers, Tag, Store, Package, Calendar, FileText, CheckCircle2, Loader2, User, Phone, Mail, UserCircle, MapPin, Building, IndianRupee, Box } from 'lucide-react';
 import { motion } from 'motion/react';
 
+import { API_BASE_URL } from '../config/api';
+
+
 // ----------------------------------------------------------------------
 // TICKET CLASSIFICATION DATA (from your Excel)
 // ----------------------------------------------------------------------
@@ -36,10 +39,15 @@ const TICKET_CLASSIFICATION: Record<string, Record<string, string[]>> = {
     "Service Request - After Warranty": ["Fungus / Termite", "Crack / Breakage /Bend/Scratches", "Fabric - Sagging / Stitches coming out /Peel off", "Mechanism not working", "Rusting"],
     "Service Request - Under Warranty": ["Fungus / Termite", "Crack / Breakage /Bend/Scratches", "Fabric - Sagging / Stitches coming out /Peel off", "Mechanism not working", "Rusting"],
     "CRF Fitment": ["CRF Part Fitment"]
+  },
+  Installation: {
+    "Installation Delay": ["Customer Not Available", "Fitter Not Available", "Customer Asked to Reschedule", "Other"],
+    "Installation Quality": ["Fitter Arrived Late", "Fitter Behavior Issue", "Installation Not Proper", "Damage During Installation", "Other"],
+    "Installation Inquiry": ["Installation Process", "Installation Charges", "Reschedule Installation", "Other"]
   }
 };
 
-const TICKET_TYPES = ["Complaint", "Request", "Query", "CRF"];
+const TICKET_TYPES = ["Complaint", "Request", "Query", "CRF", 'Installation'];
 
 // ----------------------------------------------------------------------
 // MAIN COMPONENT
@@ -89,9 +97,20 @@ export const CreateTicket: React.FC = () => {
   const [customerMobile, setCustomerMobile] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
 
-  // Hidden/backend defaults
-  const [commentedById] = useState("67f8a2c3e4b0d5a1b2c3d4e5");
-  const [commentedBy] = useState("Support Agent");
+  // Helper to retrieve logged-in user from localStorage
+  const getUserFromLocalStorage = () => {
+    try {
+      const raw = localStorage.getItem("hometown_user");
+      if (!raw) {
+        console.warn("No hometown_user found in localStorage");
+        return null;
+      }
+      return JSON.parse(raw);
+    } catch (err) {
+      console.error("Failed to parse hometown_user from localStorage", err);
+      return null;
+    }
+  };
 
   const availableCategories = TICKET_CLASSIFICATION[selectedType] ? Object.keys(TICKET_CLASSIFICATION[selectedType]) : [];
   const availableSubcategories = selectedCategory ? TICKET_CLASSIFICATION[selectedType]?.[selectedCategory] || [] : [];
@@ -100,16 +119,21 @@ export const CreateTicket: React.FC = () => {
   useEffect(() => {
     const fetchStores = async () => {
       try {
-        const response = await fetch('http://localhost:5001/api/users');
+        const response = await fetch(`${API_BASE_URL}/users`);
         const data = await response.json();
+    
         if (data.success && Array.isArray(data.data)) {
-          setStores(data.data);
+          // Get only SERVICE_MANAGER users
+          const filteredStores = data.data.filter(
+            (user) => user.role === "SERVICE_MANAGER"
+          );
+          setStores(filteredStores);
         } else {
-          console.warn('Unexpected API response format, using fallback');
+          console.warn("Unexpected API response format, using fallback");
           setStores([]);
         }
       } catch (error) {
-        console.error('Error fetching stores:', error);
+        console.error("Error fetching stores:", error);
         setStores([]);
       } finally {
         setLoadingStores(false);
@@ -163,7 +187,18 @@ export const CreateTicket: React.FC = () => {
       return;
     }
 
-    // Build payload matching backend schema
+    // Retrieve user data from localStorage
+    const userData = getUserFromLocalStorage();
+    const createdBy = userData?.name || "";
+    const createdById = userData?.id || "";
+    // Adjust field name if your stored user uses 'store' or 'site' for the store name
+    const createdBystore = userData?.location || userData?.storeName || "";
+
+    if (!createdBy || !createdById || !createdBystore) {
+      console.warn("Missing user data from localStorage. Ticket will be created without full creator info.");
+    }
+
+    // Build payload matching backend schema + added creator fields
     const payload = {
       type: selectedType,
       category: selectedCategory,
@@ -193,6 +228,10 @@ export const CreateTicket: React.FC = () => {
         state: state || undefined,
         pincode: pincode || undefined,
       },
+      // ----- NEW FIELDS FROM LOCALSTORAGE -----
+      createdBy,
+      createdById,
+      createdBystore,
     };
 
     try {
