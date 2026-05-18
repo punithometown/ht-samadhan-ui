@@ -1,7 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Filter, MoreVertical, Plus, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { API_BASE_URL } from '../config/api';
+
 
 interface Ticket {
   _id: string;
@@ -51,31 +54,59 @@ export const Tickets: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch tickets from API
+  // Fetch tickets from API with role‑based filtering
   useEffect(() => {
     const fetchTickets = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:5001/api/tickets');
+        setError(null);
+
+        // 1. Get user data from localStorage
+        const userDataRaw = localStorage.getItem('hometown_user');
+        if (!userDataRaw) {
+          throw new Error('User session not found. Please log in again.');
+        }
+
+        let userData;
+        try {
+          userData = JSON.parse(userDataRaw);
+        } catch {
+          throw new Error('Invalid user session data.');
+        }
+
+        const role = userData.role;
+        const siteId = userData.siteId;
+
+        // 2. Build API URL – if role is not HO, filter by siteId
+        let apiUrl = `${API_BASE_URL}/tickets`;
+        if (role && role.toUpperCase() !== 'ADMIN') {
+          if (!siteId) {
+            throw new Error('Site ID missing for non‑HO user.');
+          }
+          apiUrl += `?siteId=${encodeURIComponent(siteId)}`;
+        }
+
+        // 3. Fetch tickets
+        const response = await fetch(apiUrl);
         const result = await response.json();
         
         if (result.success && Array.isArray(result.data)) {
           setTickets(result.data);
         } else {
-          setError('Invalid response format');
+          setError(result.message || 'Invalid response format from server.');
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching tickets:', err);
-        setError('Failed to load tickets. Please check if the server is running.');
+        setError(err.message || 'Failed to load tickets. Please check if the server is running.');
       } finally {
         setLoading(false);
       }
     };
 
     fetchTickets();
-  }, []);
+  }, []); // Empty dependency array – runs once on mount
 
-  // Extract unique stores (sites) and types from tickets
+  // Extract unique stores (sites) and types from the fetched tickets
   const stores = ['All Stores', ...new Set(tickets.map(t => t.site).filter(Boolean))];
   const types = ['All Types', ...new Set(tickets.map(t => t.type).filter(Boolean))];
 
@@ -183,9 +214,9 @@ export const Tickets: React.FC = () => {
               >
                 <Filter size={14} /> Filter
               </button>
-              <button className="flex-1 sm:flex-none px-4 py-2 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest shadow-sm hover:bg-slate-800 transition-colors">
+              {/* <button className="flex-1 sm:flex-none px-4 py-2 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest shadow-sm hover:bg-slate-800 transition-colors">
                 Report CSV
-              </button>
+              </button> */}
             </div>
           </div>
 
@@ -243,7 +274,7 @@ export const Tickets: React.FC = () => {
                 <th className="px-6 py-5">Status</th>
                 <th className="px-6 py-5">Created</th>
                 <th className="px-6 py-5 text-center">Actions</th>
-               </tr>
+              </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-slate-50">
               {filteredTickets.map((ticket) => (

@@ -52,6 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           <div className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mb-4 px-3 py-2">
+            {console.log(user)}
             {user.role.replace('_', ' ')} Management
           </div>
           

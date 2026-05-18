@@ -1,8 +1,8 @@
 import { LucideIcon } from 'lucide-react';
 
 export enum Role {
-  HO = 'HO',
-  STORE_MANAGER = 'STORE_MANAGER',
+  ADMIN = 'ADMIN',
+  SERVICE_MANAGER = 'SERVICE_MANAGER',
   WAREHOUSE = 'WAREHOUSE',
   DELIVERY = 'DELIVERY',
   FITTER = 'FITTER'
@@ -17,7 +17,8 @@ export interface MenuItem {
 export interface User {
   id: string;
   name: string;
-  role: Role;
+  role: string;
   email: string;
   location?: string;
+  siteId?: string;
 }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, 
   UserPlus, 
@@ -11,163 +11,204 @@ import {
   XCircle,
   Clock,
   X,
-  ChevronLeft,
-  ChevronRight,
+  User as UserIcon,
   Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Role } from '../types';
+
+import { API_BASE_URL } from '../config/api';
+
+
+// ----------------------------------------------------------------------
+// STATIC STORE LIST (as provided)
+// ----------------------------------------------------------------------
+const stores = [
+  { siteId: "6346", name: "HT-SILIGURI" },
+  { siteId: "6036", name: "HT Bhubaneshwar Janpath" },
+  { siteId: "6139", name: "HT-PATNA-BHAVYA ICONIC TOWER" },
+  { siteId: "6150", name: "HT-PUNE-SEASONS MALL-HADAPSAR" },
+  { siteId: "6095", name: "HT- Vizag CMR Central Mall" },
+  { siteId: "6063", name: "HT -Nashik City Center Mall" },
+  { siteId: "6098", name: "HT - GUWAHATI Lachit Nagar" },
+  { siteId: "6343", name: "HT-NAGPUR" },
+  { siteId: "6357", name: "HT-KOLKATA-DCN MALL" },
+  { siteId: "6140", name: "HT-LUCKNOW-GOMTI NAGAR" },
+  { siteId: "6144", name: "HT-RAIPUR-LALGANGA" },
+  { siteId: "6068", name: "HT Aurangabad-Prozone Mall" },
+  { siteId: "6352", name: "HT KOL-BHAVANIPUR Homeland" }
+];
+
+// ----------------------------------------------------------------------
+// TYPES
+// ----------------------------------------------------------------------
+interface User {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  siteId: string;
+  role: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface NewUserForm {
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  siteId: string;
+}
+
+// Helper to format role for display
+const formatRole = (role: string) => {
+  return role.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+};
+
+// Get badge style based on role
+const getRoleBadge = (role: string) => {
+  switch(role) {
+    case 'ADMIN':
+    case 'HO':
+      return 'bg-blue-50 text-blue-600 border-blue-100';
+    case 'SERVICE_MANAGER':
+      return 'bg-orange-50 text-orange-600 border-orange-100';
+    case 'WAREHOUSE':
+      return 'bg-purple-50 text-purple-600 border-purple-100';
+    case 'DELIVERY':
+      return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+    case 'FITTER':
+      return 'bg-rose-50 text-rose-600 border-rose-100';
+    default:
+      return 'bg-gray-50 text-gray-600 border-gray-100';
+  }
+};
 
 export const UserManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [fetching, setFetching] = useState(true);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const itemsPerPage = 5;
-
-  // Users state
-  const [users, setUsers] = useState<any[]>([]);
-
-  // New user form state
-  const [newUser, setNewUser] = useState({
+  
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState<NewUserForm>({
     name: '',
     email: '',
     phone: '',
-    password: '',
-    role: Role.STORE_CSD,
+    role: 'SERVICE_MANAGER',
+    siteId: stores[0]?.siteId || ''   // default to first store
   });
 
   // Fetch users from API
   const fetchUsers = async () => {
-    setFetching(true);
+    setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:5001/api/users');
-      if (!response.ok) throw new Error('Failed to fetch users');
-      const data = await response.json();
-      // Transform API users to match component structure if needed
-      // Assuming API returns array of user objects with name, email, role, etc.
-      setUsers(data.map((u: any) => ({
-        id: u.id || u._id,
-        name: u.name,
-        email: u.email,
-        role: mapRoleToEnum(u.role),
-        location: u.location || 'Not specified',
-        status: u.status || 'Active',
-        lastLogin: u.lastLogin || 'Never',
-      })));
-    } catch (err: any) {
-      setError(err.message);
+      const response = await fetch(`${API_BASE_URL}/users`);
+      const result = await response.json();
+      if (result.success && Array.isArray(result.data)) {
+        setUsers(result.data);
+      } else {
+        throw new Error(result.message || 'Failed to fetch users');
+      }
+    } catch (err) {
       console.error(err);
+      setError('Unable to load users. Please check the server.');
     } finally {
-      setFetching(false);
+      setLoading(false);
     }
-  };
-
-  // Map API role string to Role enum
-  const mapRoleToEnum = (roleStr: string): Role => {
-    switch (roleStr?.toUpperCase()) {
-      case 'HO': return Role.HO;
-      case 'STORE_CSD': return Role.STORE_CSD;
-      case 'WAREHOUSE': return Role.WAREHOUSE;
-      case 'DELIVERY': return Role.DELIVERY;
-      case 'FITTER': return Role.FITTER;
-      default: return Role.STORE_CSD;
-    }
-  };
-
-  // Map Role enum to API role string
-  const mapEnumToRole = (role: Role): string => {
-    return role; // Role enum values already match API expectation (e.g., "HO", "STORE_CSD")
   };
 
   useEffect(() => {
     fetchUsers();
   }, []);
 
-  const getRoleBadge = (role: Role) => {
-    switch(role) {
-      case Role.HO: return 'bg-blue-50 text-blue-600 border-blue-100';
-      case Role.STORE_CSD: return 'bg-orange-50 text-orange-600 border-orange-100';
-      case Role.WAREHOUSE: return 'bg-purple-50 text-purple-600 border-purple-100';
-      case Role.DELIVERY: return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-      case Role.FITTER: return 'bg-rose-50 text-rose-600 border-rose-100';
-      default: return 'bg-gray-50 text-gray-600 border-gray-100';
-    }
-  };
-
-  // Filter users based on tab, search
-  const filteredUsers = useMemo(() => {
-    let filtered = users;
-    
-    if (activeTab === 'HO') {
-      filtered = filtered.filter(user => user.role === Role.HO);
-    } else if (activeTab === 'Field') {
-      filtered = filtered.filter(user => user.role !== Role.HO);
-    } else if (activeTab === 'Inactive') {
-      filtered = filtered.filter(user => user.status === 'Inactive');
-    }
-    
-    if (searchTerm.trim()) {
-      filtered = filtered.filter(user => 
-        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    return filtered;
-  }, [users, activeTab, searchTerm]);
-
-  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
-  const paginatedUsers = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    return filteredUsers.slice(start, start + itemsPerPage);
-  }, [filteredUsers, currentPage]);
-
-  const handleAddUser = async () => {
-    setLoading(true);
+  // Create new user via API
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
     setError(null);
     try {
-      const payload = {
-        name: newUser.name,
-        email: newUser.email,
-        phone: newUser.phone,
-        password: newUser.password,
-        role: mapEnumToRole(newUser.role),
-      };
-      const response = await fetch('http://localhost:5001/api/users', {
+      const response = await fetch(`${API_BASE_URL}/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(formData)
       });
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || 'Failed to create user');
+      const result = await response.json();
+      if (result.success) {
+        await fetchUsers(); // refresh list
+        setShowModal(false);
+        setFormData({ 
+          name: '', 
+          email: '', 
+          phone: '', 
+          role: 'SERVICE_MANAGER', 
+          siteId: stores[0]?.siteId || '' 
+        });
+      } else {
+        alert(`Creation failed: ${result.message}`);
       }
-      const createdUser = await response.json();
-      // Add new user to local state with transformed structure
-      setUsers(prev => [{
-        id: createdUser.id || createdUser._id,
-        name: createdUser.name,
-        email: createdUser.email,
-        role: mapRoleToEnum(createdUser.role),
-        location: createdUser.location || 'Not specified',
-        status: createdUser.status || 'Active',
-        lastLogin: 'Never',
-      }, ...prev]);
-      setIsModalOpen(false);
-      setNewUser({ name: '', email: '', phone: '', password: '', role: Role.STORE_CSD });
-      setCurrentPage(1);
-    } catch (err: any) {
-      setError(err.message);
-      alert(`Error: ${err.message}`);
+    } catch (err) {
+      console.error(err);
+      alert('Network error. Please try again.');
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
+
+  // Filter users based on role tab and search query
+  const filteredUsers = users.filter(user => {
+    // Role filter
+    if (activeTab !== 'all') {
+      if (activeTab === 'Admin' && !['ADMIN', 'HO'].includes(user.role)) return false;
+      if (activeTab === 'Store' && user.role !== 'SERVICE_MANAGER') return false;
+      if (activeTab === 'Logistics' && !['DELIVERY', 'WAREHOUSE'].includes(user.role)) return false;
+      if (activeTab === 'Field' && user.role !== 'FITTER') return false;
+    }
+    // Search filter
+    const searchLower = searchQuery.toLowerCase();
+    return user.name.toLowerCase().includes(searchLower) || 
+           user.email.toLowerCase().includes(searchLower) ||
+           user.siteId.toLowerCase().includes(searchLower);
+  });
+
+  // Helper to get status display
+  const getStatusDisplay = (isActive: boolean) => {
+    return isActive ? { text: 'Active', icon: CheckCircle2, color: 'bg-emerald-100 text-emerald-700' }
+                    : { text: 'Inactive', icon: XCircle, color: 'bg-slate-100 text-slate-500' };
+  };
+
+  // Format last activity (using updatedAt)
+  const formatLastActivity = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+        <p className="text-red-700">{error}</p>
+        <button onClick={fetchUsers} className="mt-4 px-4 py-2 bg-red-100 rounded-lg text-xs font-bold">
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -177,7 +218,7 @@ export const UserManagement: React.FC = () => {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">User Management</h1>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => setShowModal(true)}
           className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 shrink-0 uppercase tracking-wider text-xs"
         >
           <UserPlus size={18} />
@@ -188,15 +229,12 @@ export const UserManagement: React.FC = () => {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
         {/* Filters and Tabs */}
         <div className="p-5 border-b border-slate-100 flex flex-col lg:flex-row items-center justify-between gap-6 bg-slate-50/30">
-          <div className="flex bg-slate-200/50 p-1 rounded-xl w-full lg:w-auto">
-            {['all', 'HO', 'Field', 'Inactive'].map((tab) => (
+          <div className="flex bg-slate-200/50 p-1 rounded-xl w-full lg:w-auto overflow-x-auto no-scrollbar">
+            {['all', 'Admin', 'Store', 'Logistics', 'Field'].map((tab) => (
               <button
                 key={tab}
-                onClick={() => {
-                  setActiveTab(tab);
-                  setCurrentPage(1);
-                }}
-                className={`flex-1 lg:flex-none px-6 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                onClick={() => setActiveTab(tab)}
+                className={`whitespace-nowrap px-6 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
                   activeTab === tab 
                   ? 'bg-white text-slate-900 shadow-sm' 
                   : 'text-slate-500 hover:text-slate-700'
@@ -212,12 +250,9 @@ export const UserManagement: React.FC = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                 <input 
                   type="text" 
-                  placeholder="Search name or email..." 
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setCurrentPage(1);
-                  }}
+                  placeholder="Search name, email or site ID..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-orange-500/20 transition-all outline-none"
                 />
              </div>
@@ -229,28 +264,24 @@ export const UserManagement: React.FC = () => {
 
         {/* User Table */}
         <div className="overflow-x-auto min-h-[500px]">
-          {fetching ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
-            </div>
-          ) : error ? (
-            <div className="text-center py-20 text-red-500">Error: {error}</div>
-          ) : (
-            <table className="w-full text-left">
-              <thead className="bg-slate-50/50">
-                <tr className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">
-                  <th className="px-6 py-5">Identified Employee</th>
-                  <th className="px-6 py-5">Role & Node</th>
-                  <th className="px-6 py-5">Verification</th>
-                  <th className="px-6 py-5">Status</th>
-                  <th className="px-6 py-5">Last Activity</th>
-                  <th className="px-6 py-5 text-center">Actions</th>
-                 </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {paginatedUsers.map((user, idx) => (
+          <table className="w-full text-left">
+            <thead className="bg-slate-50/50">
+              <tr className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">
+                <th className="px-6 py-5">Identified Employee</th>
+                <th className="px-6 py-5">Role & Node</th>
+                <th className="px-6 py-5">Verification</th>
+                <th className="px-6 py-5">Status</th>
+                <th className="px-6 py-5">Last Activity</th>
+                <th className="px-6 py-5 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filteredUsers.map((user, idx) => {
+                const statusInfo = getStatusDisplay(user.isActive);
+                const StatusIcon = statusInfo.icon;
+                return (
                   <motion.tr 
-                    key={user.id}
+                    key={user._id}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.05 }}
@@ -259,7 +290,7 @@ export const UserManagement: React.FC = () => {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-xs uppercase group-hover:bg-orange-100 group-hover:text-orange-600 transition-colors">
-                            {user.name.split(' ').map((n: string) => n[0]).join('')}
+                            {user.name.split(' ').map(n=>n[0]).join('')}
                          </div>
                          <div>
                             <p className="text-sm font-bold text-slate-900">{user.name}</p>
@@ -269,16 +300,22 @@ export const UserManagement: React.FC = () => {
                             </div>
                          </div>
                       </div>
-                     </td>
+                    </td>
                     <td className="px-6 py-4">
                       <div className={`inline-flex px-2 py-0.5 rounded border text-[9px] font-black uppercase tracking-widest mb-1 ${getRoleBadge(user.role)}`}>
-                         {user.role.replace('_', ' ')}
+                         {formatRole(user.role)}
                       </div>
-                      <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold">
-                         <MapPin size={10} />
-                         {user.location}
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1 text-[10px] text-slate-500 font-bold">
+                           <span className="text-[8px] bg-slate-100 px-1 rounded text-slate-400">Site ID</span>
+                           {user.siteId}
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium">
+                           <MapPin size={10} />
+                           {user.siteId || 'N/A'}
+                        </div>
                       </div>
-                     </td>
+                    </td>
                     <td className="px-6 py-4">
                        <div className="flex items-center gap-2">
                           <ShieldCheck size={16} className="text-emerald-500" />
@@ -286,19 +323,13 @@ export const UserManagement: React.FC = () => {
                        </div>
                      </td>
                     <td className="px-6 py-4">
-                       <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                         user.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 
-                         user.status === 'Inactive' ? 'bg-slate-100 text-slate-500' : 
-                         'bg-orange-100 text-orange-700'
-                       }`}>
-                          {user.status === 'Active' ? <CheckCircle2 size={10} /> : 
-                           user.status === 'Inactive' ? <XCircle size={10} /> : 
-                           <Clock size={10} />}
-                          {user.status}
+                       <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${statusInfo.color}`}>
+                          <StatusIcon size={10} />
+                          {statusInfo.text}
                        </span>
                      </td>
                     <td className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-tighter italic">
-                      {user.lastLogin}
+                      {formatLastActivity(user.updatedAt)}
                      </td>
                     <td className="px-6 py-4 text-center">
                       <button className="p-2 hover:bg-white rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-slate-900 transition-all shadow-sm">
@@ -306,148 +337,144 @@ export const UserManagement: React.FC = () => {
                       </button>
                      </td>
                   </motion.tr>
-                ))}
-                {paginatedUsers.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-slate-400 text-sm">
-                      No users found matching your criteria.
-                     </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
+                );
+              })}
+              {filteredUsers.length === 0 && (
+                 <tr>
+                  <td colSpan={6} className="text-center py-12 text-slate-500 text-sm">
+                    No users found.
+                   </td>
+                 </tr>
+              )}
+            </tbody>
+           </table>
         </div>
 
         <div className="p-5 border-t border-slate-100 bg-slate-50/10 flex items-center justify-between shrink-0">
            <div className="flex items-center gap-4">
-               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                 Page {currentPage} of {totalPages || 1}
-               </p>
+               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Page 1 of 1</p>
                <div className="h-4 w-[1px] bg-slate-200" />
-               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                 Total {filteredUsers.length} User{filteredUsers.length !== 1 ? 's' : ''} Found
-               </p>
+               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Total {filteredUsers.length} Users Found</p>
            </div>
            <div className="flex gap-2">
-              <button 
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft size={14} className="inline mr-1" />
-                Previous
-              </button>
-              <button 
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages || totalPages === 0}
-                className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-                <ChevronRight size={14} className="inline ml-1" />
-              </button>
+              <button className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-widest text-slate-400 cursor-not-allowed">Previous</button>
+              <button className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-widest text-slate-600 hover:bg-slate-50 transition-colors shadow-sm">Next Page</button>
            </div>
         </div>
       </div>
 
-      {/* Add User Modal */}
+      {/* Provision User Modal */}
       <AnimatePresence>
-        {isModalOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
-              className="fixed inset-0 bg-black/50 z-50"
-            />
-            <motion.div
+        {showModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white rounded-2xl shadow-2xl z-50 overflow-hidden"
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200"
             >
-              <div className="flex items-center justify-between p-6 border-b border-slate-100">
-                <h2 className="text-lg font-bold text-slate-900">Provision New User</h2>
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Provision User</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">New System Node Access</p>
+                </div>
                 <button 
-                  onClick={() => setIsModalOpen(false)}
-                  className="p-1 rounded-lg hover:bg-slate-100 transition-colors"
+                  onClick={() => setShowModal(false)}
+                  className="p-2 hover:bg-white rounded-lg text-slate-400 transition-colors border border-transparent hover:border-slate-200"
                 >
-                  <X size={20} className="text-slate-400" />
+                  <X size={20} />
                 </button>
               </div>
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Full Name *</label>
-                  <input
-                    type="text"
-                    value={newUser.name}
-                    onChange={(e) => setNewUser({...newUser, name: e.target.value})}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                    placeholder="e.g., Rahul Sharma"
-                  />
+
+              <form onSubmit={handleAddUser} className="p-6 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Full Name</label>
+                  <div className="relative">
+                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    <input 
+                      required
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      placeholder="e.g. John Doe"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-medium"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Email Address *</label>
-                  <input
-                    type="email"
-                    value={newUser.email}
-                    onChange={(e) => setNewUser({...newUser, email: e.target.value})}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                    placeholder="user@company.in"
-                  />
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                    <input 
+                      required
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      placeholder="john.doe@hometown.in"
+                      className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-medium"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Phone Number *</label>
-                  <input
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Phone Number</label>
+                  <input 
+                    required
                     type="tel"
-                    value={newUser.phone}
-                    onChange={(e) => setNewUser({...newUser, phone: e.target.value})}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                    placeholder="9876543210"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    placeholder="10-digit mobile number"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-medium"
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Password *</label>
-                  <input
-                    type="password"
-                    value={newUser.password}
-                    onChange={(e) => setNewUser({...newUser, password: e.target.value})}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-                    placeholder="********"
-                  />
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* SITE ID DROPDOWN - replaced free text */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Site ID</label>
+                    <select
+                      required
+                      value={formData.siteId}
+                      onChange={(e) => setFormData({...formData, siteId: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-medium"
+                    >
+                      {stores.map((store) => (
+                        <option key={store.siteId} value={store.siteId}>
+                          {store.name} ({store.siteId})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">System Role</label>
+                    <select 
+                      value={formData.role}
+                      onChange={(e) => setFormData({...formData, role: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-medium"
+                    >
+                      <option value="ADMIN">ADMIN</option>
+                      <option value="SERVICE_MANAGER">SERVICE_MANAGER</option>
+                      <option value="WAREHOUSE">WAREHOUSE</option>
+                      <option value="DELIVERY">DELIVERY</option>
+                      <option value="FITTER">FITTER</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-500 mb-1">Role *</label>
-                  <select
-                    value={newUser.role}
-                    onChange={(e) => setNewUser({...newUser, role: e.target.value as Role})}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+
+                <div className="pt-4">
+                  <button 
+                    disabled={isSubmitting}
+                    type="submit"
+                    className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold uppercase tracking-[0.1em] text-xs hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 flex items-center justify-center gap-2"
                   >
-                    {Object.values(Role).map(role => (
-                      <option key={role} value={role}>{role.replace('_', ' ')}</option>
-                    ))}
-                  </select>
+                    {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : null}
+                    {isSubmitting ? 'Provisioning...' : 'Confirm Access Request'}
+                  </button>
                 </div>
-              </div>
-              <div className="flex gap-3 p-6 border-t border-slate-100 bg-slate-50/30">
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 px-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-white transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddUser}
-                  disabled={loading || !newUser.name || !newUser.email || !newUser.phone || !newUser.password}
-                  className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-bold hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {loading && <Loader2 size={16} className="animate-spin" />}
-                  {loading ? 'Creating...' : 'Create User'}
-                </button>
-              </div>
+              </form>
             </motion.div>
-          </>
+          </div>
         )}
       </AnimatePresence>
     </div>
