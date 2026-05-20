@@ -10,6 +10,7 @@ interface User {
   name: string;
   phone: string;
   role: string;
+  siteId?: string;
 }
 
 interface Ticket {
@@ -22,6 +23,7 @@ interface Ticket {
   site: string;
   description: string;
   productDetails?: any;
+  siteCode?: string;
 }
 
 export const DeliveryAssignment: React.FC = () => {
@@ -53,6 +55,7 @@ export const DeliveryAssignment: React.FC = () => {
           const { line1, city, state, pincode } = t.serviceAddress;
           address = [line1, city, state, pincode].filter(Boolean).join(', ');
         }
+        let siteId = t.siteCode
 
         setTicket({
           _id: t._id,
@@ -70,7 +73,7 @@ export const DeliveryAssignment: React.FC = () => {
         const usersRes = await fetch(`${API_BASE_URL}/users`);
         const usersData = await usersRes.json();
         if (usersData.success && Array.isArray(usersData.data)) {
-          const deliveryAgents = usersData.data.filter((u: User) => u.role === 'DELIVERY');
+          const deliveryAgents = usersData.data.filter((u: User) => u.role === 'DELIVERY' && u.siteId === siteId);
           setAgents(deliveryAgents);
         }
       } catch (err) {
@@ -194,7 +197,7 @@ export const DeliveryAssignment: React.FC = () => {
               <p className="text-sm font-mono font-bold text-slate-800">{ticket.orderId}</p>
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Issue Description</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest"> Description</p>
               <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-lg">{ticket.description}</p>
             </div>
           </div>

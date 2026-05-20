@@ -77,7 +77,7 @@ export const FittingManagement: React.FC = () => {
         }
 
         const fittingTickets = data.data
-          .filter((t: any) =>  t.type == 'Installation' && t.isDelivery == true && t.isFitting == false)
+          .filter((t: any) =>  t.type == 'Installation' && t.isDelivery == true && t.isFitting == false && t.isDeliveryDone == true)
           .map((t: any) => ({
             _id: t._id,
             ticketNumber: t.ticketNumber,

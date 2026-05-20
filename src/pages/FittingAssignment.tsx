@@ -10,6 +10,7 @@ interface User {
   name: string;
   phone: string;
   role: string;
+  siteId?: string;
 }
 
 interface Ticket {
@@ -24,6 +25,7 @@ interface Ticket {
   productDetails?: any;
   type: string;
   category: string;
+  siteCode?: string;
 }
 
 export const FittingAssignment: React.FC = () => {
@@ -54,7 +56,7 @@ export const FittingAssignment: React.FC = () => {
           const { line1, city, state, pincode } = t.serviceAddress;
           address = [line1, city, state, pincode].filter(Boolean).join(', ');
         }
-
+       let sideId = t.siteCode;
         setTicket({
           _id: t._id,
           ticketNumber: t.ticketNumber,
@@ -73,7 +75,7 @@ export const FittingAssignment: React.FC = () => {
         const usersRes = await fetch(`${API_BASE_URL}/users`);
         const usersData = await usersRes.json();
         if (usersData.success && Array.isArray(usersData.data)) {
-          const fitterList = usersData.data.filter((u: User) => u.role === 'FITTER');
+          const fitterList = usersData.data.filter((u: User) => u.role === 'FITTER' && u.siteId == sideId);
           setFitters(fitterList);
         }
       } catch (err) {
@@ -105,7 +107,7 @@ export const FittingAssignment: React.FC = () => {
     try {
       const fitter = fitters.find(f => f._id === selectedFitter);
       const payload = {
-        status: 'FITTING_SCHEDULED', // or keep 'ASSIGNED_TO_FITTER' but add fitting info
+        status: 'FITTING_AGENT_ASSIGNED', // or keep 'ASSIGNED_TO_FITTER' but add fitting info
         assignedToFitterName: fitter?.name,
         assignedToFitterId: fitter?._id,
         isFitting: true,
@@ -201,7 +203,7 @@ export const FittingAssignment: React.FC = () => {
               <p className="text-xs font-bold text-slate-800">{ticket.type} / {ticket.category}</p>
             </div>
             <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Issue Description</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest"> Description</p>
               <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-lg">{ticket.description}</p>
             </div>
           </div>

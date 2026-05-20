@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Layers, Tag, Store, Package, Calendar, FileText, CheckCircle2, Loader2, User, Phone, Mail, UserCircle, MapPin, Building, IndianRupee, Box } from 'lucide-react';
+import { ArrowLeft, Send, Layers, Tag, Store, Package, Calendar, FileText, CheckCircle2, Loader2, User, Phone, Mail, UserCircle, MapPin, Building, IndianRupee, Box, Globe } from 'lucide-react';
 import { motion } from 'motion/react';
 
 import { API_BASE_URL } from '../config/api';
-
 
 // ----------------------------------------------------------------------
 // TICKET CLASSIFICATION DATA (from your Excel)
@@ -48,6 +47,8 @@ const TICKET_CLASSIFICATION: Record<string, Record<string, string[]>> = {
 };
 
 const TICKET_TYPES = ["Complaint", "Request", "Query", "CRF", 'Installation'];
+const SOURCE_OPTIONS = ["WEB_APP", "MOBILE_APP", "EMAIL", "WHATSAPP", "CALL_CENTER", "STORE"];
+
 
 // ----------------------------------------------------------------------
 // MAIN COMPONENT
@@ -74,6 +75,9 @@ export const CreateTicket: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>("");
   const [description, setDescription] = useState("");
+
+  // Ticket Source
+  const [source, setSource] = useState<string>("WEB_APP");
 
   // Assignment to Store (using siteId as identifier)
   const [assignedSiteId, setAssignedSiteId] = useState("");
@@ -191,7 +195,6 @@ export const CreateTicket: React.FC = () => {
     const userData = getUserFromLocalStorage();
     const createdBy = userData?.name || "";
     const createdById = userData?.id || "";
-    // Adjust field name if your stored user uses 'store' or 'site' for the store name
     const createdBystore = userData?.location || userData?.storeName || "";
 
     if (!createdBy || !createdById || !createdBystore) {
@@ -205,7 +208,7 @@ export const CreateTicket: React.FC = () => {
       subCategory: selectedSubcategory,
       description,
       customer: "",
-      source: "WEB_APP",
+      source,                              // <-- dynamic source
       site: assignedStoreName,
       siteCode: assignedSiteId,
       assignedStore: {
@@ -228,14 +231,13 @@ export const CreateTicket: React.FC = () => {
         state: state || undefined,
         pincode: pincode || undefined,
       },
-      // ----- NEW FIELDS FROM LOCALSTORAGE -----
       createdBy,
       createdById,
       createdBystore,
     };
 
     try {
-      const response = await fetch('http://localhost:5001/api/tickets', {
+      const response = await fetch(`${API_BASE_URL}/tickets`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -276,7 +278,7 @@ export const CreateTicket: React.FC = () => {
       </div>
 
       <div className="space-y-8">
-        {/* SECTION 1: ISSUE CLASSIFICATION */}
+        {/* SECTION 1: ISSUE CLASSIFICATION + SOURCE */}
         <motion.section
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -336,6 +338,24 @@ export const CreateTicket: React.FC = () => {
               </div>
             </div>
 
+            {/* New Source Field */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  <Globe size={12} /> Source / Channel
+                </label>
+                <select
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-orange-500/20"
+                >
+                  {SOURCE_OPTIONS.map(opt => (
+                    <option key={opt} value={opt}>{opt.replace(/_/g, ' ')}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
             {/* Description */}
             <div className="space-y-2">
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
@@ -352,7 +372,7 @@ export const CreateTicket: React.FC = () => {
           </div>
         </motion.section>
 
-        {/* SECTION 2: CUSTOMER DETAILS */}
+        {/* SECTION 2: CUSTOMER DETAILS (unchanged) */}
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 bg-slate-50/30 flex items-center gap-2">
             <User size={16} className="text-orange-500" />
@@ -403,7 +423,7 @@ export const CreateTicket: React.FC = () => {
           </div>
         </section>
 
-        {/* SECTION 3: ORDER DETAILS (extended) */}
+        {/* SECTION 3: ORDER DETAILS (unchanged) */}
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 bg-slate-50/30 flex items-center gap-2">
             <Package size={16} className="text-orange-500" />
@@ -471,7 +491,7 @@ export const CreateTicket: React.FC = () => {
           </div>
         </section>
 
-        {/* SECTION 4: SERVICE ADDRESS */}
+        {/* SECTION 4: SERVICE ADDRESS (unchanged) */}
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 bg-slate-50/30 flex items-center gap-2">
             <MapPin size={16} className="text-orange-500" />
@@ -525,7 +545,7 @@ export const CreateTicket: React.FC = () => {
           </div>
         </section>
 
-        {/* SECTION 5: ASSIGNMENT TO STORE */}
+        {/* SECTION 5: ASSIGNMENT TO STORE (unchanged) */}
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 bg-slate-50/30 flex items-center gap-2">
             <Store size={16} className="text-orange-500" />
