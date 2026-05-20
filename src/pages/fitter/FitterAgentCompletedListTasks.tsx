@@ -16,7 +16,6 @@ import { motion } from 'motion/react';
 
 import { API_BASE_URL } from '../../config/api';
 
-
 interface FittingTask {
   _id: string;
   ticketNumber: string;
@@ -51,16 +50,18 @@ interface FittingTask {
     pincode?: string;
     landmark?: string;
   };
+  // Boolean flags expected from backend
+  isFitting?: boolean;
+  isFittingDone?: boolean;
 }
 
-export const FitterTasksList: React.FC = () => {
+export const FitterTasksCompletedList: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [tasks, setTasks] = useState<FittingTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Fetch tickets assigned to fitter ──────────────────────────────────────
   useEffect(() => {
     const fetchTasks = async () => {
       try {
@@ -80,26 +81,35 @@ export const FitterTasksList: React.FC = () => {
         const role = userData.role;
         const siteId = userData.siteId;
 
+        // Build query parameters based on required flags
         const params = new URLSearchParams();
-        params.set('status', 'ASSIGNED_TO_FITTER');
+        params.set('isFitting', 'true');
+        params.set('isFittingDone', 'true');
 
+        // For non-HO users, restrict by siteId
         if (role && role.toUpperCase() !== 'HO') {
           if (!siteId) throw new Error('Site ID missing for non-HO user.');
           params.set('siteId', siteId);
         }
 
         const apiUrl = `${API_BASE_URL}/tickets?${params.toString()}`;
-
         const response = await fetch(apiUrl);
         const result = await response.json();
 
         if (result.success && Array.isArray(result.data)) {
-          setTasks(result.data);
+          // Client‑side safety: ensure both flags are true and site matches (if backend doesn't enforce)
+          const filtered = result.data.filter(
+            (t: FittingTask) =>
+              t.isFitting === true &&
+              t.isFittingDone === true &&
+              (role?.toUpperCase() === 'HO' || t.site === siteId || t.siteCode === siteId)
+          );
+          setTasks(filtered);
         } else {
           setError(result.message || 'Invalid response format from server.');
         }
       } catch (err: any) {
-        console.error('Error fetching fitter tasks:', err);
+        console.error('Error fetching completed fitting tasks:', err);
         setError(err.message || 'Failed to load tasks. Please check if the server is running.');
       } finally {
         setLoading(false);
@@ -109,7 +119,7 @@ export const FitterTasksList: React.FC = () => {
     fetchTasks();
   }, []);
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // ── Helpers (unchanged) ─────────────────────────────────────────────────
   const formatAddress = (task: FittingTask): string => {
     const a = task.serviceAddress;
     if (!a) return task.site || 'No address provided';
@@ -129,6 +139,7 @@ export const FitterTasksList: React.FC = () => {
     switch (status) {
       case 'ASSIGNED_TO_FITTER': return 'bg-orange-50 text-orange-600 border-orange-100';
       case 'IN_PROGRESS':        return 'bg-yellow-50 text-yellow-600 border-yellow-100';
+      case 'FITTING_DONE':
       case 'RESOLVED':           return 'bg-emerald-50 text-emerald-600 border-emerald-100';
       case 'OPEN':               return 'bg-blue-50 text-blue-600 border-blue-100';
       case 'CLOSED':             return 'bg-slate-100 text-slate-500 border-slate-200';
@@ -162,7 +173,7 @@ export const FitterTasksList: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-        <p className="text-slate-500 text-sm ml-3">Loading assignments...</p>
+        <p className="text-slate-500 text-sm ml-3">Loading completed fittings...</p>
       </div>
     );
   }
@@ -187,8 +198,8 @@ export const FitterTasksList: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">On-Site Technical</h3>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Technical Assignments</h1>
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">Completed Installations</h3>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Fitting Done</h1>
         </div>
         <div className="flex items-center gap-2">
           <div className="bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm flex items-center gap-3">
@@ -212,70 +223,51 @@ export const FitterTasksList: React.FC = () => {
         />
       </div>
 
-      {/* Task Cards */}
+      {/* Task Cards (Table-like rows) */}
       {filteredTasks.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
           <Wrench size={32} className="text-slate-300 mx-auto mb-3" />
-          <p className="text-slate-500 text-sm font-medium">No assignments found.</p>
+          <p className="text-slate-500 text-sm font-medium">No completed fitting tasks found.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-4">
           {filteredTasks.map((task) => (
             <motion.div
               key={task._id}
               onClick={() => navigate(`/fitter-task/${task._id}`)}
-              className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:shadow-orange-500/5 transition-all cursor-pointer overflow-hidden group"
+              className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer overflow-hidden group"
             >
-              <div className="p-5 border-b border-slate-50">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-orange-500 group-hover:text-white transition-all">
-                      <Wrench size={20} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{task.ticketNumber}</p>
-                      <h4 className="text-sm font-black text-slate-900">
-                        {task.productDetails?.orderId ? `Order #${task.productDetails.orderId}` : task.type}
-                      </h4>
-                    </div>
-                  </div>
-                  <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${getStatusColor(task.status)}`}>
-                    {statusLabel(task.status)}
-                  </span>
-                </div>
-
-                <div className="space-y-3 mb-4">
-                  <div className="flex items-start gap-2">
-                    <MapPin size={14} className="text-slate-300 mt-0.5 shrink-0" />
-                    <p className="text-xs font-medium text-slate-600 leading-relaxed">{formatAddress(task)}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Clock size={14} className="text-slate-300 shrink-0" />
-                    <p className="text-[11px] font-bold text-slate-900 uppercase tracking-tight">
-                      Created: {formatDate(task.createdAt)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Hammer size={14} className="text-slate-300 shrink-0" />
-                    <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${complexityFromType(task) === 'Complex' ? 'bg-purple-50 text-purple-600' : 'bg-slate-100 text-slate-600'}`}>
-                      {complexityFromType(task)} Job
+              <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                {/* Left: Ticket info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      {task.ticketNumber}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase border ${getStatusColor(task.status)}`}>
+                      {statusLabel(task.status)}
                     </span>
                   </div>
+                  <p className="text-sm font-black text-slate-900 truncate">
+                    {task.customerName || task.customerMobile}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-slate-500">
+                    <span className="flex items-center gap-1">
+                      <Phone size={10} /> {task.customerMobile}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MapPin size={10} /> {formatAddress(task).substring(0, 60)}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock size={10} /> {formatDate(task.createdAt)}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-2 line-clamp-1">{jobScope(task)}</p>
                 </div>
 
-                <div className="bg-slate-50 rounded-lg p-3">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Job Scope</p>
-                  <p className="text-xs text-slate-700 font-medium truncate">{jobScope(task)}</p>
-                </div>
-              </div>
-
-              <div className="px-5 py-3 bg-slate-50/50 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Phone size={12} className="text-slate-400" />
-                  <span className="text-[10px] font-bold text-slate-600">{task.customerMobile}</span>
-                </div>
-                <button className="flex items-center gap-1.5 text-[9px] font-black text-orange-500 uppercase tracking-widest">
-                  Update Progress <Navigation size={12} />
+                {/* Right: Action */}
+                <button className="shrink-0 flex items-center gap-1.5 text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition">
+                  View Details <Navigation size={12} />
                 </button>
               </div>
             </motion.div>

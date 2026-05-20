@@ -5,7 +5,8 @@ export enum Role {
   SERVICE_MANAGER = 'SERVICE_MANAGER',
   WAREHOUSE = 'WAREHOUSE',
   DELIVERY = 'DELIVERY',
-  FITTER = 'FITTER'
+  FITTER = 'FITTER',
+  STORE_USER = 'STORE_USER',
 }
 
 export interface MenuItem {

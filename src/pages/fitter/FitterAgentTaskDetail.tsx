@@ -17,12 +17,13 @@ import {
   IndianRupee,
   User,
   ArrowLeft,
-  FileText
+  FileText,
+  Section,
+  Ticket
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import { API_BASE_URL } from '../../config/api';
-
 
 // Interface matching the SparePartRequest schema (backend)
 interface SparePartRequestDoc {
@@ -72,7 +73,7 @@ interface FittingTask {
     pincode?: string;
     landmark?: string;
   };
-  comments?: Array<{ message: string; commentedBy: string; createdAt: string }>;
+  comments?: Array<{ comment: string; commentedBy: string; createdAt: string }>;
 }
 
 export const FitterTaskDetail: React.FC = () => {
@@ -149,12 +150,21 @@ export const FitterTaskDetail: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'ASSIGNED_TO_FITTER': return 'bg-orange-50 text-orange-600 border-orange-100';
-      case 'IN_PROGRESS':        return 'bg-yellow-50 text-yellow-600 border-yellow-100';
-      case 'RESOLVED':           return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-      case 'OPEN':               return 'bg-blue-50 text-blue-600 border-blue-100';
-      case 'CANCELLED':          return 'bg-rose-50 text-rose-600 border-rose-100';
-      default:                   return 'bg-slate-100 text-slate-500 border-slate-200';
+      case 'ASSIGNED_TO_FITTER':
+      case 'FITTING_IN_PROGRESS':
+        return 'bg-orange-50 text-orange-600 border-orange-100';
+      case 'SPARE_PART_REQUIRED':
+        return 'bg-purple-50 text-purple-600 border-purple-100';
+      case 'FITTING_DONE':
+        return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+      case 'RESOLVED':
+        return 'bg-emerald-50 text-emerald-600 border-emerald-100';
+      case 'OPEN':
+        return 'bg-blue-50 text-blue-600 border-blue-100';
+      case 'CANCELLED':
+        return 'bg-rose-50 text-rose-600 border-rose-100';
+      default:
+        return 'bg-slate-100 text-slate-500 border-slate-200';
     }
   };
 
@@ -170,19 +180,50 @@ export const FitterTaskDetail: React.FC = () => {
   };
 
   const statusLabel = (status: string) => status.replace(/_/g, ' ');
-  const statusOptions = ['IN_PROGRESS', 'RESOLVED', 'CANCELLED'];
 
-  // ── Update ticket status & comment ───────────────────────────────────────
+  // New fitting-specific status options
+  const statusOptions = ['FITTING_IN_PROGRESS', 'FITTING_DONE', 'SPARE_PART_REQUIRED'];
+
+  // Get logged-in user details for comment fields
+  const getLoggedInUser = () => {
+    try {
+      const raw = localStorage.getItem('hometown_user');
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  };
+
+  // ── Update ticket status & comment using required format ─────────────────
   const handleUpdate = async () => {
     if (!task || (!updateStatus && !newComment.trim())) return;
 
+    const user = getLoggedInUser();
+    if (!user) {
+      alert('User session not found. Please log in again.');
+      return;
+    }
+
     try {
       setUpdating(true);
-      const payload: Record<string, any> = {};
-      if (updateStatus) payload.status = updateStatus;
-      if (newComment.trim()) payload.comment = `${updateStatus || task.status}: ${newComment}`;
 
-      const response = await fetch(`http://localhost:5001/api/tickets/${task._id}`, {
+      // Prepare the comment object exactly as required by the backend
+      let finalStatus = updateStatus || task.status;
+      const commentText = ` ${newComment} and  Ticket updated with status ${statusLabel(finalStatus)}`;
+
+      const payload: any = {
+        status: finalStatus,
+        commentedBy: user.name || "Fitter",
+        commentedById: user.id || user._id,
+        comment: commentText,
+      };
+
+      if (finalStatus === "FITTING_DONE") {
+        payload.isFittingDone = true;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/tickets/${task._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -190,13 +231,18 @@ export const FitterTaskDetail: React.FC = () => {
       const result = await response.json();
       if (result.success) {
         // Refresh ticket (to get updated status and comments)
-        const updatedRes = await fetch(`http://localhost:5001/api/tickets/${id}`);
+        const updatedRes = await fetch(`${API_BASE_URL}/tickets/${id}`);
         const updatedResult = await updatedRes.json();
         if (updatedResult.success && updatedResult.data) {
           setTask(updatedResult.data);
         }
         setUpdateStatus('');
         setNewComment('');
+
+        // If status is SPARE_PART_REQUIRED, optionally open the spare part form
+        if (finalStatus === 'SPARE_PART_REQUIRED') {
+          setShowSparePartForm(true);
+        }
       } else {
         alert(result.message || 'Failed to update ticket.');
       }
@@ -214,17 +260,9 @@ export const FitterTaskDetail: React.FC = () => {
       return;
     }
 
-    // Get logged-in fitter data
-    const userRaw = localStorage.getItem('hometown_user');
-    if (!userRaw) {
+    const user = getLoggedInUser();
+    if (!user) {
       alert('User session not found. Please log in again.');
-      return;
-    }
-    let user;
-    try {
-      user = JSON.parse(userRaw);
-    } catch {
-      alert('Invalid user data.');
       return;
     }
 
@@ -234,13 +272,21 @@ export const FitterTaskDetail: React.FC = () => {
         ticketId: task._id,
         sparePart: sparePartForm.sparePart.trim(),
         urgency: sparePartForm.urgency,
-        requestById: user.id,
-        requestByName: user.name,
+        requestById: user.id || user._id,
+        requestByName: user.name || 'Fitter',
         reason: sparePartForm.reason.trim() || undefined,
         quantity: sparePartForm.quantity,
+        ticketNumber: task.ticketNumber,
+        ticketDescription: task.description,
+        ticketType: task.type,
+        ticketStore: task.site,
+        ticketStoreCode: task.siteCode,
+        ticketCustomerName: task.customerName,
+        ticketCustomerMobile: task.customerMobile,
+        ticketServiceAddress: formatAddress(task),
       };
 
-      const response = await fetch('http://localhost:5001/api/spare-part-requests', {
+      const response = await fetch(`${API_BASE_URL}/spare-part-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -249,10 +295,28 @@ export const FitterTaskDetail: React.FC = () => {
       if (result.success && result.data) {
         // Add the new request to local state
         setSpareRequests(prev => [result.data, ...prev]);
-        // Optionally add a comment on the ticket (could be automated by backend)
         // Reset form
         setSparePartForm({ sparePart: '', quantity: 1, reason: '', urgency: 'Normal' });
         setShowSparePartForm(false);
+
+        // Optionally add a comment to the ticket about the spare part request
+        await fetch(`${API_BASE_URL}/tickets/${task._id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            comment: `Spare part requested: ${sparePartForm.sparePart} (${sparePartForm.urgency} urgency)`,
+            commentedBy: user.name || 'Fitter',
+            commentedById: user.id || user._id,
+            message: `Spare part request created`,
+            status: task.status // keep current status
+          })
+        });
+        // Refresh ticket to show new comment
+        const updatedRes = await fetch(`${API_BASE_URL}/tickets/${id}`);
+        const updatedResult = await updatedRes.json();
+        if (updatedResult.success && updatedResult.data) {
+          setTask(updatedResult.data);
+        }
       } else {
         alert(result.message || 'Failed to submit spare part request.');
       }
@@ -380,32 +444,31 @@ export const FitterTaskDetail: React.FC = () => {
 
         {/* Issue Description */}
         <section className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Issue / Scope of Work</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Description</p>
           <p className="text-sm text-slate-700 leading-relaxed">{task.description}</p>
         </section>
 
         {/* Progress Reporting */}
         <section className="space-y-4 bg-white rounded-xl p-5 border border-slate-200 shadow-sm">
           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-            <Clock size={14} /> Progress Reporting
+            <Clock size={14} /> Fitting Progress
           </h4>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {statusOptions.map((status) => (
               <button
                 key={status}
                 onClick={() => setUpdateStatus(status)}
-                className={`py-2.5 px-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${
-                  updateStatus === status
-                    ? 'bg-orange-500 text-white border-orange-600'
-                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-orange-50'
-                }`}
+                className={`py-2.5 px-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all ${updateStatus === status
+                  ? 'bg-orange-500 text-white border-orange-600'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-orange-50'
+                  }`}
               >
                 {statusLabel(status)}
               </button>
             ))}
           </div>
           <textarea
-            placeholder="Technical comments, parts used, or issues encountered..."
+            placeholder="Add technical comments, parts used, issues encountered, or notes about the fitting process..."
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-medium focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all min-h-[80px]"
@@ -514,6 +577,56 @@ export const FitterTaskDetail: React.FC = () => {
               ))
             )}
           </div>
+        </section>
+
+        <section>
+          {task.comments && task.comments.length > 0 && (
+            <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="bg-slate-50/50 px-4 py-3 border-b border-slate-100">
+                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                  <Clock size={12} /> Activity Timeline
+                </h4>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {task.comments.slice().reverse().map((comment, idx) => {
+                  const statusFromMsg = comment.status;
+                  return (
+                    <div key={idx} className="p-4 hover:bg-slate-50 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <div className="shrink-0 mt-0.5">
+                          <div className="w-2 h-2 rounded-full bg-slate-300 ring-2 ring-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <span className="text-xs font-bold text-slate-800">
+                              {comment.commentedBy || 'System'}
+                            </span>
+                            {statusFromMsg && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase bg-orange-100 text-orange-700">
+                                <span className="w-1 h-1 rounded-full bg-orange-400" />
+                                {statusFromMsg.replace(/_/g, ' ')}
+                              </span>
+                            )}
+                            <span className="text-[9px] text-slate-400">
+                              {formatDateTime(comment.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-700 leading-relaxed">
+                            {comment.comment}
+                          </p>
+                          {comment.comment && comment.comment !== comment.comment && (
+                            <p className="text-[11px] text-slate-500 mt-1 italic">
+                              {comment.comment}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </section>
       </div>
     </div>

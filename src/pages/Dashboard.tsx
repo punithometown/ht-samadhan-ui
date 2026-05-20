@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  BarChart3, 
-  TrendingUp, 
-  AlertCircle, 
-  Clock, 
-  CheckCircle2, 
+import {
+  BarChart3,
+  TrendingUp,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
   Filter,
   Package,
   Wrench,
@@ -13,17 +13,17 @@ import {
   ChevronDown,
   Box,
   ShoppingBag,
-  Loader2
+  Loader2,
+  XCircle
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 
 import { API_BASE_URL } from '../config/api';
-
 
 interface Ticket {
   _id: string;
   ticketNumber: string;
-  type: string;
+  type: string;               // "CRF", "Complaint", "Request"
   category: string;
   subCategory: string;
   description: string;
@@ -38,12 +38,16 @@ interface Ticket {
   updatedAt: string;
   productDetails?: any;
   serviceAddress?: any;
+  // Boolean flags (must be provided by backend)
+  isDelivery?: boolean;
+  isDeliveryDone?: boolean;
+  isFitting?: boolean;
+  isFittingDone?: boolean;
 }
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  
-  // State for user role and site (from localStorage)
+
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userSiteId, setUserSiteId] = useState<string | null>(null);
   const [selectedStore, setSelectedStore] = useState('All Stores');
@@ -51,145 +55,183 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Read user data from localStorage on mount
+  // Read user from localStorage
   useEffect(() => {
     try {
-      const userDataRaw = localStorage.getItem('hometown_user');
-      if (userDataRaw) {
-        const userData = JSON.parse(userDataRaw);
-        setUserRole(userData.role || null);
-        setUserSiteId(userData.siteId || null);
+      const raw = localStorage.getItem('hometown_user');
+      if (raw) {
+        const data = JSON.parse(raw);
+        setUserRole(data.role || null);
+        setUserSiteId(data.siteId || null);
       } else {
-        setError('User session not found. Please log in again.');
+        setError('User session not found.');
       }
-    } catch (err) {
-      console.error('Error parsing user data:', err);
+    } catch {
       setError('Invalid user session data.');
     }
   }, []);
 
-  // Fetch tickets based on role (HO sees all; non‑HO sees only their site)
+  // Fetch tickets
   useEffect(() => {
     const fetchTickets = async () => {
-      if (!userRole) return; // wait for user data
-
+      if (!userRole) return;
       try {
         setLoading(true);
-        setError(null);
-        
-        let apiUrl = `${API_BASE_URL}/tickets`;
+        let url = `${API_BASE_URL}/tickets`;
         const isHO = userRole.toUpperCase() === 'ADMIN';
-        
-        if (!isHO) {
-          if (!userSiteId) {
-            throw new Error('Site ID missing for non‑HO user.');
-          }
-          apiUrl += `?siteCode=${encodeURIComponent(userSiteId)}`;
+        if (!isHO && userSiteId) {
+          url += `?siteCode=${encodeURIComponent(userSiteId)}`;
         }
-        
-        const response = await fetch(apiUrl);
-        const result = await response.json();
-        
+        const res = await fetch(url);
+        const result = await res.json();
         if (result.success && Array.isArray(result.data)) {
           setTickets(result.data);
         } else {
-          setError(result.message || 'Invalid data format from server.');
+          setError(result.message || 'Invalid data.');
         }
       } catch (err: any) {
-        console.error('Error fetching tickets:', err);
-        setError(err.message || 'Failed to load dashboard data. Please check the server.');
+        setError(err.message || 'Failed to load dashboard.');
       } finally {
         setLoading(false);
       }
     };
-
     fetchTickets();
   }, [userRole, userSiteId]);
 
-  // Helper: get unique stores from tickets (for HO filter)
-  const stores = ['All Stores', ...new Set(tickets.map(t => t.site).filter(Boolean))];
   const isHO = userRole?.toUpperCase() === 'ADMIN';
-
-  // Filter tickets by selected store (only for HO; non‑HO already have site‑filtered data)
+  const stores = ['All Stores', ...new Set(tickets.map(t => t.site).filter(Boolean))];
   const filteredTickets = isHO && selectedStore !== 'All Stores'
     ? tickets.filter(t => t.site === selectedStore)
     : tickets;
 
-  // Compute statistics based on filtered tickets and role
-  const computeStats = () => {
-    const openStatuses = ['OPEN', 'ASSIGNED_TO_STORE_MANAGER', 'ASSIGNED_TO_FITTER', 'ASSIGNED_TO_DELIVERY', 'VISIT_SCHEDULED', 'IN_PROGRESS', 'CUSTOMER_NOT_AVAILABLE', 'WAITING_FOR_PARTS'];
-    const resolvedStatuses = ['RESOLVED'];
-    
-    const openTickets = filteredTickets.filter(t => openStatuses.includes(t.status)).length;
-    const closedTickets = filteredTickets.filter(t => resolvedStatuses.includes(t.status)).length;
-    const today = new Date().toISOString().split('T')[0];
-    const ticketsCreatedToday = filteredTickets.filter(t => t.createdAt.startsWith(today)).length;
-    const ticketsWithType = (type: string) => filteredTickets.filter(t => t.type === type).length;
+  // ---------- Stat definitions ----------
+  const openStatuses = [
+    'OPEN', 'ASSIGNED_TO_STORE_MANAGER', 'ASSIGNED_TO_FITTER', 'ASSIGNED_TO_DELIVERY',
+    'VISIT_SCHEDULED', 'IN_PROGRESS', 'CUSTOMER_NOT_AVAILABLE', 'WAITING_FOR_PARTS',
+    'FITTING_IN_PROGRESS'
+  ];
+  const resolvedStatuses = ['RESOLVED', 'CLOSED', 'FITTING_DONE'];
 
-    switch(userRole?.toUpperCase()) {
-      case 'ADMIN':
-        return [
-          { label: 'Open Tickets', value: openTickets, change: '+12%', icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50' },
-          { label: 'Closed Tickets', value: closedTickets, change: '+3%', icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Deliveries Today', value: ticketsCreatedToday, change: '85% SLA', icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Installations', value: ticketsWithType('CRF'), change: 'Live', icon: Wrench, color: 'text-purple-600', bg: 'bg-purple-50' },
-          { label: 'Issue Tickets', value: ticketsWithType('Complaint'), change: '-8%', icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50' },
-        ];
+  const openCount = filteredTickets.filter(t => openStatuses.includes(t.status)).length;
+  const resolvedCount = filteredTickets.filter(t => resolvedStatuses.includes(t.status)).length;
+
+  // Delivery
+  const deliveryInProgress = filteredTickets.filter(t => t.isDelivery === true && t.isDeliveryDone !== true).length;
+  const deliveryDone = filteredTickets.filter(t => t.isDeliveryDone === true).length;
+
+  // Fitting
+  const fittingInProgress = filteredTickets.filter(t => t.isFitting === true && t.isFittingDone !== true).length;
+  const fittingDone = filteredTickets.filter(t => t.isFittingDone === true).length;
+
+  // Non‑fitting (isFitting !== true)
+  const nonFitting = filteredTickets.filter(t => t.isFitting !== true).length;
+
+  // CRF (installation)
+  const crfTickets = filteredTickets.filter(t => t.type === 'CRF').length;
+
+  // ----- TAT calculations (average hours) -----
+  const computeAverageTAT = (ticketsToCheck: Ticket[], startField: keyof Ticket, endField: keyof Ticket) => {
+    const valid = ticketsToCheck.filter(t => t[startField] && t[endField]);
+    if (valid.length === 0) return 0;
+    const totalHours = valid.reduce((sum, t) => {
+      const start = new Date(t[startField] as string);
+      const end = new Date(t[endField] as string);
+      return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+    }, 0);
+    return Math.round(totalHours / valid.length);
+  };
+
+  // For delivery TAT: tickets where isDeliveryDone === true, using createdAt -> updatedAt
+  const deliveryTAT = computeAverageTAT(
+    filteredTickets.filter(t => t.isDeliveryDone === true),
+    'createdAt', 'updatedAt'
+  );
+  // For fitting TAT: tickets where isFittingDone === true
+  const fittingTAT = computeAverageTAT(
+    filteredTickets.filter(t => t.isFittingDone === true),
+    'createdAt', 'updatedAt'
+  );
+  // For issue tickets (type === 'Complaint')
+  const issueTAT = computeAverageTAT(
+    filteredTickets.filter(t => t.type === 'Complaint' && resolvedStatuses.includes(t.status)),
+    'createdAt', 'updatedAt'
+  );
+
+  // Recent tickets (last 5)
+  const recentTickets = [...filteredTickets]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 5);
+
+  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+
+  // --- Admin stats cards (full list) ---
+  const adminStats = [
+    { label: 'Open Tickets', value: openCount, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50', desc: 'Require action' },
+    { label: 'Resolved Tickets', value: resolvedCount, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', desc: 'Closed' },
+    { label: 'Delivery In Progress', value: deliveryInProgress, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50', desc: 'On road' },
+    { label: 'Delivery Done', value: deliveryDone, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50', desc: 'Completed' },
+    { label: 'Fitting In Progress', value: fittingInProgress, icon: Wrench, color: 'text-indigo-600', bg: 'bg-indigo-50', desc: 'Assigned' },
+    { label: 'Fitting Done', value: fittingDone, icon: CheckCircle2, color: 'text-teal-600', bg: 'bg-teal-50', desc: 'Completed' },
+    { label: 'Non‑Fitting Tickets', value: nonFitting, icon: Package, color: 'text-amber-600', bg: 'bg-amber-50', desc: 'Other types' },
+    { label: 'CRF (Installations)', value: crfTickets, icon: BarChart3, color: 'text-purple-600', bg: 'bg-purple-50', desc: 'Orders' },
+  ];
+
+  // TAT cards
+  const tatCards = [
+    { label: 'Delivery TAT', value: `${deliveryTAT}h`, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50', target: 'Target ≤ 48h' },
+    { label: 'Fitting TAT', value: `${fittingTAT}h`, icon: Wrench, color: 'text-indigo-600', bg: 'bg-indigo-50', target: 'Target ≤ 72h' },
+    { label: 'Issue Tickets TAT', value: `${issueTAT}h`, icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50', target: 'Target ≤ 24h' },
+  ];
+
+  // For non‑admin roles, we reuse the original role‑based stats (optional)
+  const computeRoleStats = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const ticketsToday = filteredTickets.filter(t => t.createdAt.startsWith(todayStr)).length;
+    const ticketsByType = (type: string) => filteredTickets.filter(t => t.type === type).length;
+
+    switch (userRole?.toUpperCase()) {
       case 'STORE_MANAGER':
         return [
-          { label: 'Open Tickets', value: openTickets, change: '+12%', icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50' },
-          { label: 'Closed Today', value: ticketsCreatedToday, change: 'Live', icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Fitting Jobs', value: ticketsWithType('CRF'), change: '8 Assigned', icon: Wrench, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Deliveries', value: ticketsWithType('Request'), change: '12 Out', icon: Truck, color: 'text-purple-600', bg: 'bg-purple-50' },
-          { label: 'Issue Tickets', value: ticketsWithType('Complaint'), change: 'Critical', icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50' },
+          { label: 'Open Tickets', value: openCount, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50' },
+          { label: 'Closed Today', value: ticketsToday, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Fitting Jobs', value: ticketsByType('CRF'), icon: Wrench, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Deliveries', value: ticketsByType('Request'), icon: Truck, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: 'Issue Tickets', value: ticketsByType('Complaint'), icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50' },
         ];
       case 'WAREHOUSE':
         return [
-          { label: 'Pending Picks', value: openTickets, change: '+12', icon: Box, color: 'text-orange-600', bg: 'bg-orange-50' },
-          { label: 'Store Requests', value: ticketsWithType('Request'), change: '5 Stores', icon: ShoppingBag, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Ready Dispatch', value: closedTickets, change: 'Live', icon: Truck, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Shortage Alerts', value: ticketsWithType('Query'), icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50' },
+          { label: 'Pending Picks', value: openCount, icon: Box, color: 'text-orange-600', bg: 'bg-orange-50' },
+          { label: 'Store Requests', value: ticketsByType('Request'), icon: ShoppingBag, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Ready Dispatch', value: resolvedCount, icon: Truck, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Shortage Alerts', value: ticketsByType('Query'), icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50' },
         ];
       case 'DELIVERY':
         return [
-          { label: 'Pending Deliveries', value: ticketsWithType('Request'), change: 'Assign Soon', icon: Truck, color: 'text-orange-600', bg: 'bg-orange-50' },
-          { label: 'Closed Today', value: ticketsCreatedToday, change: 'Great Job!', icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Scheduled Tasks', value: openTickets, change: 'Weekly View', icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Fuel Allowance', value: '₹450', change: 'Verified', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: 'Pending Deliveries', value: deliveryInProgress, icon: Truck, color: 'text-orange-600', bg: 'bg-orange-50', desc: 'Not yet done' },
+          { label: 'Delivered Today', value: ticketsToday, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Scheduled', value: openCount, icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Fuel Allowance', value: '₹450', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
         ];
       case 'FITTER':
         return [
-          { label: 'Pending Fittings', value: ticketsWithType('CRF'), change: 'Today', icon: Wrench, color: 'text-orange-600', bg: 'bg-orange-50' },
-          { label: 'Jobs Closed', value: closedTickets, change: 'Weekly', icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Spare Requests', value: ticketsWithType('Complaint'), change: 'Critical', icon: Package, color: 'text-rose-600', bg: 'bg-rose-50' },
-          { label: 'Avg TAT', value: '4.2h', change: 'Good', icon: BarChart3, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Pending Fittings', value: fittingInProgress, icon: Wrench, color: 'text-orange-600', bg: 'bg-orange-50' },
+          { label: 'Fitting Done', value: fittingDone, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Spare Requests', value: ticketsByType('Complaint'), icon: Package, color: 'text-rose-600', bg: 'bg-rose-50' },
+          { label: 'Avg TAT', value: `${fittingTAT}h`, icon: BarChart3, color: 'text-blue-600', bg: 'bg-blue-50' },
         ];
       default:
         return [];
     }
   };
 
-  const stats = computeStats();
-
-  // Recent tickets (last 5 by creation date)
-  const recentTickets = [...filteredTickets]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5);
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-    });
-  };
+  const displayStats = isHO ? adminStats : computeRoleStats();
+  const showTatCards = isHO; // only admin sees TAT cards
 
   if (loading || userRole === null) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-orange-500 mx-auto mb-4" />
-          <p className="text-slate-600 text-sm">Loading dashboard...</p>
-        </div>
+      <div className="flex justify-center items-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <p className="ml-3 text-slate-500">Loading dashboard...</p>
       </div>
     );
   }
@@ -198,11 +240,8 @@ export const Dashboard: React.FC = () => {
     return (
       <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
         <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-3" />
-        <p className="text-red-700 text-sm font-medium">{error}</p>
-        <button 
-          onClick={() => window.location.reload()}
-          className="mt-4 px-4 py-2 bg-red-100 text-red-800 rounded-lg text-xs font-bold uppercase"
-        >
+        <p className="text-red-700">{error}</p>
+        <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-100 rounded-lg text-xs font-bold">
           Retry
         </button>
       </div>
@@ -211,208 +250,119 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      {/* Header & Store Filter */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">Executive Samadhan Metrics</h3>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Operations Overview</h1>
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-1">
+            {isHO ? 'Head Office Analytics' : 'Store Performance'}
+          </h3>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+            {isHO ? 'Operations Dashboard' : `${userRole?.replace('_', ' ')} Dashboard`}
+          </h1>
         </div>
-        
         {isHO && (
-          <div className="relative group">
-            <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm hover:border-orange-200 transition-colors cursor-pointer">
+          <div className="relative">
+            <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl px-4 py-2 shadow-sm">
               <Filter size={14} className="text-slate-400" />
-              <select 
+              <select
                 value={selectedStore}
                 onChange={(e) => setSelectedStore(e.target.value)}
                 className="bg-transparent text-xs font-bold text-slate-700 outline-none appearance-none pr-6 min-w-[140px]"
               >
                 {stores.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <ChevronDown size={14} className="text-slate-400 absolute right-4 pointer-events-none" />
+              <ChevronDown size={14} className="text-slate-400 pointer-events-none -ml-4" />
             </div>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-        {stats.map((stat, idx) => (
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {displayStats.map((stat, idx) => (
           <motion.div
             key={stat.label}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow group relative overflow-hidden"
+            transition={{ delay: idx * 0.05 }}
+            className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-all"
           >
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-4">{stat.label}</p>
-            <div className="flex items-end justify-between relative z-10">
-              <span className="text-4xl font-extrabold text-slate-900 tracking-tighter">{stat.value}</span>
-            </div>
-            <div className="absolute -bottom-2 -right-2 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity rotate-12">
-              <stat.icon size={80} />
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</p>
+                <p className="text-3xl font-extrabold text-slate-900 mt-2">{stat.value}</p>
+                {stat.desc && <p className="text-[9px] text-slate-500 mt-1">{stat.desc}</p>}
+              </div>
+              <div className={`p-2 rounded-lg ${stat.bg}`}>
+                <stat.icon size={18} className={stat.color} />
+              </div>
             </div>
           </motion.div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col min-h-[400px]">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between shrink-0">
-            <h2 className="text-lg font-bold text-slate-800">
-              {userRole?.toUpperCase() === 'DELIVERY' ? 'My Delivery Jobs (Today)' : 
-               userRole?.toUpperCase() === 'FITTER' ? 'My Installation Schedule' : 'Priority Tickets (Escalations)'}
-            </h2>
-            <div className="flex gap-2">
-              {userRole?.toUpperCase() === 'DELIVERY' || userRole?.toUpperCase() === 'FITTER' ? (
-                <button 
-                  onClick={() => navigate(userRole?.toUpperCase() === 'DELIVERY' ? '/delivery/tasks' : '/fitter/tasks')}
-                  className="px-3 py-1.5 text-[10px] font-bold bg-orange-500 text-white rounded-lg uppercase tracking-wider hover:bg-orange-600 transition-colors shadow-sm"
-                >
-                  Manage All Tasks
-                </button>
-              ) : (
-                <>
-                  <button className="px-3 py-1.5 text-[10px] font-bold bg-slate-50 border border-slate-200 text-slate-600 rounded-lg uppercase tracking-wider hover:bg-slate-100 transition-colors">
-                    Regional View
-                  </button>
-                  <button className="px-3 py-1.5 text-[10px] font-bold bg-orange-500 text-white rounded-lg uppercase tracking-wider hover:bg-orange-600 transition-colors shadow-sm">
-                    Generate Report
-                  </button>
-                </>
-              )}
+      {/* TAT Cards (Admin only) */}
+      {showTatCards && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {tatCards.map((card, idx) => (
+            <div key={card.label} className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className={`p-2 rounded-lg ${card.bg}`}>
+                  <card.icon size={18} className={card.color} />
+                </div>
+                <h3 className="text-xs font-bold text-slate-700">{card.label}</h3>
+              </div>
+              <p className="text-2xl font-black text-slate-900">{card.value}</p>
+              <p className="text-[9px] text-slate-500 mt-1">{card.target}</p>
             </div>
-          </div>
-          
-          <div className="flex-1 overflow-x-auto">
-            <table className="w-full text-left min-w-[600px]">
-              <thead className="bg-slate-50/50 sticky top-0">
-                <tr className="text-[10px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">
-                  <th className="px-6 py-4">{userRole?.toUpperCase() === 'DELIVERY' ? 'Task ID' : 'Ticket ID'}</th>
-                  <th className="px-6 py-4 text-center">{userRole?.toUpperCase() === 'DELIVERY' ? 'Time Slot' : 'Type'}</th>
-                  <th className="px-6 py-4">Customer</th>
-                  <th className="px-6 py-4">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {userRole?.toUpperCase() === 'DELIVERY' || userRole?.toUpperCase() === 'FITTER' ? (
-                  recentTickets.map((ticket) => (
-                    <tr 
-                      key={ticket._id} 
-                      onClick={() => navigate(`/tickets/${ticket.ticketNumber}`)}
-                      className="hover:bg-slate-50/30 transition-colors group cursor-pointer"
-                    >
-                      <td className="px-6 py-4 font-mono text-xs font-bold text-slate-900">#{ticket.ticketNumber}</td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-bold uppercase tracking-wider">
-                          {userRole?.toUpperCase() === 'DELIVERY' ? 'Delivery' : 'Fitting'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-xs font-bold text-slate-700">{ticket.customerMobile}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                          ticket.status === 'OPEN' ? 'bg-orange-100 text-orange-700' : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {ticket.status.replace(/_/g, ' ')}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  recentTickets.map((ticket) => (
-                    <tr 
-                      key={ticket._id} 
-                      onClick={() => navigate(`/tickets/${ticket._id}`)}
-                      className="hover:bg-slate-50/30 transition-colors group cursor-pointer"
-                    >
-                      <td className="px-6 py-4 font-mono text-xs font-bold text-slate-900">#{ticket.ticketNumber}</td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-[9px] font-bold uppercase tracking-wider">
-                          {ticket.type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-xs font-bold text-slate-700">{ticket.customerMobile}</p>
-                        <p className="text-[10px] text-slate-400">Order ID: {ticket.productDetails?.orderId || 'N/A'}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                          ticket.status === 'OPEN' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'
-                        }`}>
-                          {ticket.status === 'OPEN' ? 'Open' : 'Escalated'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-                {recentTickets.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="text-center py-8 text-slate-500 text-sm">
-                      No tickets found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          ))}
         </div>
+      )}
 
-        <div className="flex flex-col gap-6">
-          <div className="bg-[#0F172A] rounded-xl shadow-lg p-8 text-white relative overflow-hidden group">
-            <h2 className="text-lg font-bold mb-1 relative z-10">Global Performance</h2>
-            <p className="text-slate-400 text-[10px] uppercase font-bold tracking-widest mb-8 relative z-10">System Efficiency</p>
-            
-            <div className="space-y-6 relative z-10">
-              <div>
-                <div className="flex justify-between text-[10px] font-bold mb-2 uppercase tracking-wide">
-                  <span className="text-slate-500">Service SLA</span>
-                  <span className="text-orange-400">92%</span>
-                </div>
-                <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: '92%' }}
-                    transition={{ duration: 1.5 }}
-                    className="h-full bg-orange-500"
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-[10px] font-bold mb-2 uppercase tracking-wide">
-                  <span className="text-slate-500">Resolution Rate</span>
-                  <span className="text-emerald-400">84%</span>
-                </div>
-                <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: '84%' }}
-                    transition={{ duration: 1.5, delay: 0.2 }}
-                    className="h-full bg-emerald-500"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-orange-500/10 rounded-full blur-2xl group-hover:bg-orange-500/20 transition-all" />
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Live Activity</h3>
-            <div className="space-y-4">
-              {recentTickets.slice(0, 3).map((ticket, idx) => (
-                <div key={ticket._id} className="flex gap-3">
-                  <div className="shrink-0 w-1.5 h-1.5 rounded-full bg-orange-500 mt-1.5 shadow-[0_0_8px_rgba(249,115,22,0.5)]"></div>
-                  <div>
-                    <p className="text-xs text-slate-700 leading-relaxed">
-                      <span className="font-bold">{ticket.site}</span> raised a <span className="font-bold text-orange-600">{ticket.type}</span> ticket: {ticket.description.substring(0, 60)}...
-                    </p>
-                    <p className="text-[10px] text-slate-400 mt-1">{new Date(ticket.createdAt).toLocaleTimeString()} ago</p>
-                  </div>
-                </div>
+      {/* Recent Tickets Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-slate-800">Recent Tickets</h2>
+          <button onClick={() => navigate('/tickets')} className="text-[9px] font-bold text-orange-500 uppercase tracking-wider hover:underline">
+            View All →
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50/50">
+              <tr className="text-[9px] font-bold text-slate-500 uppercase tracking-widest border-b border-slate-100">
+                <th className="px-5 py-3">Ticket #</th>
+                <th className="px-5 py-3">Store</th>
+                <th className="px-5 py-3">Type</th>
+                <th className="px-5 py-3">Customer</th>
+                <th className="px-5 py-3">Created</th>
+                <th className="px-5 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {recentTickets.map(ticket => (
+                <tr
+                  key={ticket._id}
+                  onClick={() => navigate(`/tickets/${ticket._id}`)}
+                  className="hover:bg-slate-50/50 transition-colors cursor-pointer"
+                >
+                  <td className="px-5 py-3 font-mono text-xs font-bold text-slate-900">#{ticket.ticketNumber}</td>
+                  <td className="px-5 py-3 text-xs font-medium text-slate-700">{ticket.site}</td>
+                  <td className="px-5 py-3 text-xs text-slate-600">{ticket.type}</td>
+                  <td className="px-5 py-3 text-xs text-slate-700">{ticket.customerMobile}</td>
+                  <td className="px-5 py-3 text-xs text-slate-500">{formatDate(ticket.createdAt)}</td>
+                  <td className="px-5 py-3">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase bg-slate-100 text-slate-600">
+                      {ticket.status.replace(/_/g, ' ')}
+                    </span>
+                  </td>
+                </tr>
               ))}
               {recentTickets.length === 0 && (
-                <p className="text-slate-500 text-sm text-center">No recent activity</p>
+                <tr><td colSpan={6} className="text-center py-8 text-slate-500">No tickets found.</td></tr>
               )}
-            </div>
-          </div>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

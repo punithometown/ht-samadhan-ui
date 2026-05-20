@@ -22,6 +22,8 @@ export const LoginPage: React.FC = () => {
     { label: 'Delivery Agent', role: Role.DELIVERY, email: 'munna.kumar@demo.com', description: 'On-ground dispatch & POD capture', icon: Truck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { label: 'Fitter / Installation', role: Role.FITTER, email: 'mukesh.kumar@demo.com', description: 'Technical job completion & schedules', icon: Wrench, color: 'text-rose-600', bg: 'bg-rose-50' },
     { label: 'Warehouse Ops', role: Role.WAREHOUSE, email: 'rana.ranjit@praxisretail.in', description: 'Inventory management & stock status', icon: Package, color: 'text-purple-600', bg: 'bg-purple-50' },
+    { label: 'Store Users', role: Role.STORE_USER, email: 'rana.ranjit@praxisretail.in', description: 'Inventory management & stock status', icon: Package, color: 'text-purple-600', bg: 'bg-purple-50' },
+
 
   ];
 
