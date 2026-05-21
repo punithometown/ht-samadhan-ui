@@ -445,7 +445,7 @@ export const CreateTicket: React.FC = () => {
             </div>
 
             {/* Description */}
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                 <FileText size={12} /> Description / Issue Details <span className="text-red-500">*</span>
               </label>
@@ -456,9 +456,84 @@ export const CreateTicket: React.FC = () => {
                 placeholder="Provide a detailed explanation of the issue, request, or query..."
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm resize-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 outline-none"
               />
-            </div>
+            </div> */}
           </div>
         </motion.section>
+
+
+        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-slate-100 bg-slate-50/30 flex items-center gap-2">
+            <User size={16} className="text-orange-500" />
+            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Search Order By Mobile</h2>
+            <span className="text-[10px] text-red-500">*Required</span>
+          </div>
+          <div className="p-6 space-y-5">
+            {/* First Row – Mobile Number */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <Phone size={15} /> Mobile Number <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="tel"
+                  value={customerMobile}
+                  onChange={(e) => setCustomerMobile(e.target.value)}
+                  placeholder="10-digit mobile number"
+                  className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:ring-2 transition-all pr-10 ${fetchingOrder
+                      ? 'border-orange-400 ring-2 ring-orange-500/20'
+                      : orderSearched && orderFound === false
+                        ? 'border-red-400 ring-2 ring-red-500/20'
+                        : 'border-slate-200 focus:ring-orange-500/20'
+                    }`}
+                  required
+                />
+                {fetchingOrder && (
+                  <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-orange-500 animate-spin" />
+                )}
+                {!fetchingOrder && orderSearched && orderFound === false && (
+                  <AlertCircle size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
+                )}
+              </div>
+
+              {/* 10-second progress bar while fetching */}
+              {fetchingOrder && (
+                <div className="mt-2 space-y-1">
+                  <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                    <div className="h-full bg-orange-500 rounded-full animate-progress-bar" />
+                  </div>
+                  <p className="text-[10px] text-orange-600 flex items-center gap-1 mt-1">
+                    <Loader2 size={10} className="animate-spin" /> Searching order... (please wait up to 10 seconds)
+                  </p>
+                </div>
+              )}
+
+              {!fetchingOrder && orderSearched && orderFound === false && (
+                <p className="text-[10px] text-red-600 flex items-center gap-1 mt-1">
+                  <AlertCircle size={10} /> No order found – please enter details manually
+                </p>
+              )}
+              {!fetchingOrder && orderSearched && orderFound === true && (
+                <p className="text-[10px] text-emerald-600 flex items-center gap-1 mt-1">
+                  <CheckCircle2 size={10} /> Order details auto‑filled
+                </p>
+              )}
+            </div>
+
+            {/* Second Row – Description */}
+            <div className="space-y-2">
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <FileText size={12} /> Description <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                rows={3}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Provide a detailed explanation of the issue, request, or query..."
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm resize-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 outline-none"
+              />
+            </div>
+          </div>
+        </section>
 
         {/* SECTION 2: CUSTOMER DETAILS (enhanced mobile field) */}
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -492,13 +567,12 @@ export const CreateTicket: React.FC = () => {
                     value={customerMobile}
                     onChange={(e) => setCustomerMobile(e.target.value)}
                     placeholder="10-digit mobile number"
-                    className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:ring-2 transition-all pr-10 ${
-                      fetchingOrder 
-                        ? 'border-orange-400 ring-2 ring-orange-500/20' 
-                        : orderSearched && orderFound === false 
-                          ? 'border-red-400 ring-2 ring-red-500/20' 
-                          : 'border-slate-200 focus:ring-orange-500/20'
-                    }`}
+                    className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:ring-2 transition-all pr-10 ${fetchingOrder
+                      ? 'border-orange-400 ring-2 ring-orange-500/20'
+                      : orderSearched && orderFound === false
+                        ? 'border-red-400 ring-2 ring-red-500/20'
+                        : 'border-slate-200 focus:ring-orange-500/20'
+                      }`}
                     required
                   />
                   {fetchingOrder && (
