@@ -27,6 +27,9 @@ import { DeliveryTaskUpdate } from './pages/delivery/DeliveryTaskUpdate';
 import { DeliveryAgentCompletedTasksList } from './pages/delivery/DeliveryAgentCompletedTask';
 import { StoreDashboard } from './pages/StoreDashboard';
 import { DeliveryDashboard } from './pages/delivery/DeliveryDashboard';
+import { WarehouseDashboard } from './pages/WarehouseDashboard';
+import {FitterDashboard} from './pages/fitter/FitterDashboard';
+import { WarehouseCrfList } from './pages/WarehouseCrfList';
 
 
 
@@ -59,9 +62,15 @@ export default function App() {
             <Route path="/fitter/tasks" element={<FitterTasksList />} />
             <Route path="/fitter/fitter-completed-task" element={<FitterTasksCompletedList />} />
             <Route path="/fitter-task/:id" element={<FitterTaskDetail />} />
+            <Route path="/fitter-dashboard" element={<FitterDashboard />} />
 
             <Route path="/tat-analysis" element={<TATAnalysis />} />
             <Route path="/warehouse/picks" element={<WarehouseRequests />} />
+            <Route path="/warehouse/warehouse-dashboard" element={<WarehouseDashboard />} />
+            <Route path="/warehouse/warehouse-crf" element={<WarehouseCrfList />} />
+
+
+
             <Route path="/performance" element={<PlaceholderPage title="Store Performance Analytics" />} />
             <Route path="/users" element={<UserManagement />} />
             <Route path="/customers" element={<PlaceholderPage title="Customer Database Search" />} />

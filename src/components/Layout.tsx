@@ -59,10 +59,10 @@ export const Layout: React.FC = () => {
             <div className="h-6 w-[1px] bg-slate-200" />
 
             <button className="relative text-slate-400 hover:text-orange-500 transition-colors">
-              <Bell size={20} />
+              {/* <Bell size={20} />
               <span className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 text-white text-[10px] flex items-center justify-center rounded-full border border-white font-bold">
-                5
-              </span>
+                
+              </span> */}
             </button>
             <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-all cursor-pointer">
               <UserIcon size={18} />

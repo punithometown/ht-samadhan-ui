@@ -13,9 +13,17 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    const redirectMap: Record<string, string> = {
+      ADMIN: '/dashboard', // or maybe '/admin/dashboard'
+      SERVICE_MANAGER: '/store-dashboard',
+      DELIVERY: '/delivery-dashboard',
+      FITTER: '/fitter-dashboard',
+      WAREHOUSE: '/warehouse/warehouse-dashboard',
+      STORE_USER: '/store-dashboard', // assuming store user goes to store dashboard
+    };
+    const redirectTo = redirectMap[user.role] || '/dashboard';
+    return <Navigate to={redirectTo} replace />;
   }
-
   const roleOptions = [
     { label: 'Head Office (HO)', role: Role.ADMIN, email: 'kailash.vaishanv@praxisretail.in', description: 'National oversight, analytics, and admin', icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Store CSD', role: Role.SERVICE_MANAGER, email: 'htcsd.siliguri@praxisretail.in', description: 'Store grievance handling & ticket creation', icon: Store, color: 'text-orange-600', bg: 'bg-orange-50' },
@@ -36,7 +44,7 @@ export const LoginPage: React.FC = () => {
 
     setIsLoggingIn(true);
     setError(null);
-    
+
     const success = await login(email, password);
     if (!success) {
       setError('Invalid email or password');
@@ -52,7 +60,7 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F1F5F9] flex items-center justify-center p-6">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-5xl w-full bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row border border-slate-200"
@@ -61,15 +69,15 @@ export const LoginPage: React.FC = () => {
         <div className="md:w-5/12 bg-[#0F172A] p-10 text-white flex flex-col justify-between relative overflow-hidden">
           <div className="relative z-10">
             <div className="flex items-center gap-3 mb-10">
-               <div className="bg-orange-500 p-2.5 rounded-xl shadow-lg shadow-orange-500/20">
-                 <Home className="w-6 h-6 text-white" />
-               </div>
-               <h1 className="text-2xl font-black tracking-tight">HomeTown</h1>
+              <div className="bg-orange-500 p-2.5 rounded-xl shadow-lg shadow-orange-500/20">
+                <Home className="w-6 h-6 text-white" />
+              </div>
+              <h1 className="text-2xl font-black tracking-tight">HomeTown</h1>
             </div>
             <h2 className="text-4xl font-extrabold mb-6 leading-tight tracking-tighter">
               Samadhan <span className="text-orange-500 italic font-medium text-3xl block mt-1 tracking-widest uppercase">Portal</span>
             </h2>
-            
+
             <div className="space-y-4">
               <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">Quick Selection</p>
               <div className="grid gap-2">
@@ -86,7 +94,7 @@ export const LoginPage: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="relative z-10 pt-10 border-t border-slate-800">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
@@ -108,7 +116,7 @@ export const LoginPage: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-5">
               <AnimatePresence>
                 {error && (
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
@@ -124,7 +132,7 @@ export const LoginPage: React.FC = () => {
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Business Email</label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                  <input 
+                  <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -138,7 +146,7 @@ export const LoginPage: React.FC = () => {
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Secure Password</label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                  <input 
+                  <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -166,7 +174,7 @@ export const LoginPage: React.FC = () => {
               </div>
             </form>
 
-            <div className="mt-12 pt-8 border-t border-slate-100">
+            {/* <div className="mt-12 pt-8 border-t border-slate-100">
                <div className="flex flex-col items-center gap-4">
                  <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
                    Compliance Node Access
@@ -176,7 +184,7 @@ export const LoginPage: React.FC = () => {
                     <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" className="h-4 opacity-20 grayscale" alt="" />
                  </div>
                </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </motion.div>
