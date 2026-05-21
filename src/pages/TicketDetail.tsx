@@ -439,13 +439,13 @@ export const TicketDetail: React.FC = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 items-start">
-            <input
+            {/* <input
               type="text"
               value={statusNote}
               onChange={(e) => setStatusNote(e.target.value)}
               placeholder="Optional note for this status change..."
               className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs font-medium outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-500/10 transition-all"
-            />
+            /> */}
             <button
               onClick={handleApplyStatusUpdate}
               disabled={selectedStatus === ticket.status || updatingStatus || !selectedStatus}

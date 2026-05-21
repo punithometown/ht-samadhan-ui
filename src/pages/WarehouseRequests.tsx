@@ -220,7 +220,6 @@ export const WarehouseRequests: React.FC = () => {
                   <tr key={req._id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-[10px] font-bold text-slate-400">#{req._id.slice(-6)}</span>
                         <span className="text-[10px] px-1.5 py-0.5 bg-slate-900 text-white rounded font-bold">
                           {req.ticketNumber}
                         </span>

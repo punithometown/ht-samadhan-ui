@@ -18,9 +18,9 @@ export const MENU_CONFIG: Record<Role, MenuItem[]> = {
     // { title: 'TAT Analysis', path: '/tat-analysis', icon: 'BarChart3' },
   ],
   [Role.WAREHOUSE]: [
-    { title: 'Dashboard', path: '/warehouse-dashboard', icon: 'LayoutDashboard' },
+    { title: 'Dashboard', path: '/warehouse/warehouse-dashboard', icon: 'LayoutDashboard' },
     { title: 'Pick Requests', path: '/warehouse/picks', icon: 'ClipboardList' },
-    // { title: 'Stock Status', path: '/inventory/status', icon: 'Database' },
+    { title: 'CRF', path: '/warehouse/warehouse-crf', icon: 'LayoutDashboard' },
     // { title: 'Dispatch List', path: '/dispatch', icon: 'Truck' },
   ],
   [Role.DELIVERY]: [

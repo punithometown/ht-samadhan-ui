@@ -1,12 +1,17 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Layers, Tag, Store, Package, Calendar, FileText, CheckCircle2, Loader2, User, Phone, Mail, UserCircle, MapPin, Building, IndianRupee, Box, Globe } from 'lucide-react';
+import {
+  ArrowLeft, Send, Layers, Tag, Store, Package, Calendar,
+  FileText, CheckCircle2, Loader2, User, Phone, Mail,
+  UserCircle, MapPin, Building, IndianRupee, Box, Globe, AlertCircle, Search
+} from 'lucide-react';
 import { motion } from 'motion/react';
 
 import { API_BASE_URL } from '../config/api';
 
 // ----------------------------------------------------------------------
-// TICKET CLASSIFICATION DATA (from your Excel)
+// TICKET CLASSIFICATION DATA (unchanged)
 // ----------------------------------------------------------------------
 const TICKET_CLASSIFICATION: Record<string, Record<string, string[]>> = {
   Complaint: {
@@ -46,9 +51,8 @@ const TICKET_CLASSIFICATION: Record<string, Record<string, string[]>> = {
   }
 };
 
-const TICKET_TYPES = ["Complaint", "Request", "Query", "CRF", 'Installation'];
+const TICKET_TYPES = ["Complaint", "Request", "Query", "CRF", "Installation"];
 const SOURCE_OPTIONS = ["WEB_APP", "MOBILE_APP", "EMAIL", "WHATSAPP", "CALL_CENTER", "STORE"];
-
 
 // ----------------------------------------------------------------------
 // MAIN COMPONENT
@@ -79,7 +83,7 @@ export const CreateTicket: React.FC = () => {
   // Ticket Source
   const [source, setSource] = useState<string>("WEB_APP");
 
-  // Assignment to Store (using siteId as identifier)
+  // Assignment to Store
   const [assignedSiteId, setAssignedSiteId] = useState("");
   const [assignedStoreName, setAssignedStoreName] = useState("");
 
@@ -101,6 +105,11 @@ export const CreateTicket: React.FC = () => {
   const [customerMobile, setCustomerMobile] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
 
+  // Order fetching states
+  const [fetchingOrder, setFetchingOrder] = useState(false);
+  const [orderFound, setOrderFound] = useState<boolean | null>(null); // null = not searched yet
+  const [orderSearched, setOrderSearched] = useState(false);
+
   // Helper to retrieve logged-in user from localStorage
   const getUserFromLocalStorage = () => {
     try {
@@ -116,20 +125,104 @@ export const CreateTicket: React.FC = () => {
     }
   };
 
+  // ----- Fetch order details by mobile number -----
+  const fetchOrderDetails = async (mobile: string) => {
+    setFetchingOrder(true);
+    setOrderSearched(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/spare-part-requests/order-details`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: mobile }),
+      });
+      const result = await response.json();
+      if (result.success && result.data) {
+        const data = result.data;
+
+        // Order fields
+        setOrderId(data.salesDocument || '');
+        setOrderAmount(data.grossSales ? String(data.grossSales) : '');
+        setInvoiceNumber(data.billingDocument || '');
+
+        // Build comprehensive product detail string
+        const detailParts = [];
+        if (data.article) detailParts.push(`Article: ${data.article}`);
+        if (data.description) detailParts.push(`Description: ${data.description}`);
+        if (data.billedQuantity !== undefined) detailParts.push(`Qty: ${data.billedQuantity}`);
+        if (data.mcName) detailParts.push(`MC: ${data.mcName}`);
+        if (data.lob) detailParts.push(`LOB: ${data.lob}${data.newLob ? ' / ' + data.newLob : ''}`);
+        if (data.salesDocument) detailParts.push(`Order: ${data.salesDocument}`);
+        if (data.billingDocument) detailParts.push(`Invoice: ${data.billingDocument}`);
+        if (data.productHierarchy) detailParts.push(`Hierarchy: ${data.productHierarchy}`);
+        setItemDescription(detailParts.join('\n'));
+
+        // Customer name – only fill if currently empty
+        if (!customerName.trim() && data.soldToParty) {
+          setCustomerName(data.soldToParty);
+        }
+
+        // Service Address
+        let addr = '';
+        if (data.street2) addr += data.street2;
+        if (data.street3) addr += (addr ? ', ' : '') + data.street3;
+        if (!addr && data.customerAddress) addr = data.customerAddress;
+        setAddressLine(addr);
+        setCity(data.city1 || '');
+        setPincode(data.postalCode || '');
+
+        setOrderFound(true);
+      } else {
+        // No data found – reset order fields to empty so user can fill manually
+        setOrderId('');
+        setOrderAmount('');
+        setItemDescription('');
+        setInvoiceNumber('');
+        setAddressLine('');
+        setCity('');
+        setPincode('');
+        setOrderFound(false);
+      }
+    } catch (error) {
+      console.error('Failed to fetch order details:', error);
+      setOrderFound(false);
+      // On error also reset fields
+      setOrderId('');
+      setOrderAmount('');
+      setItemDescription('');
+      setInvoiceNumber('');
+      setAddressLine('');
+      setCity('');
+      setPincode('');
+    } finally {
+      setFetchingOrder(false);
+    }
+  };
+
+  // Auto‑fetch when a 10‑digit mobile number is entered
+  useEffect(() => {
+    if (customerMobile.length === 10) {
+      fetchOrderDetails(customerMobile);
+    } else {
+      // Reset search state when number changes
+      setOrderFound(null);
+      setOrderSearched(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerMobile]);
+
   const availableCategories = TICKET_CLASSIFICATION[selectedType] ? Object.keys(TICKET_CLASSIFICATION[selectedType]) : [];
   const availableSubcategories = selectedCategory ? TICKET_CLASSIFICATION[selectedType]?.[selectedCategory] || [] : [];
 
-  // Fetch stores from /api/users
+  // Fetch stores
   useEffect(() => {
     const fetchStores = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/users`);
         const data = await response.json();
-    
+
         if (data.success && Array.isArray(data.data)) {
-          // Get only SERVICE_MANAGER users
           const filteredStores = data.data.filter(
-            (user) => user.role === "SERVICE_MANAGER"
+            (user: any) => user.role === "SERVICE_MANAGER"
           );
           setStores(filteredStores);
         } else {
@@ -164,7 +257,6 @@ export const CreateTicket: React.FC = () => {
     e.preventDefault();
     setSubmitting(true);
 
-    // Validation
     if (!selectedType || !selectedCategory || !selectedSubcategory) {
       alert('Please complete Type, Category, and Sub-Category');
       setSubmitting(false);
@@ -191,7 +283,6 @@ export const CreateTicket: React.FC = () => {
       return;
     }
 
-    // Retrieve user data from localStorage
     const userData = getUserFromLocalStorage();
     const createdBy = userData?.name || "";
     const createdById = userData?.id || "";
@@ -201,14 +292,13 @@ export const CreateTicket: React.FC = () => {
       console.warn("Missing user data from localStorage. Ticket will be created without full creator info.");
     }
 
-    // Build payload matching backend schema + added creator fields
     const payload = {
       type: selectedType,
       category: selectedCategory,
       subCategory: selectedSubcategory,
       description,
       customer: "",
-      source,                              // <-- dynamic source
+      source,
       site: assignedStoreName,
       siteCode: assignedSiteId,
       assignedStore: {
@@ -239,9 +329,7 @@ export const CreateTicket: React.FC = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/tickets`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const result = await response.json();
@@ -278,7 +366,7 @@ export const CreateTicket: React.FC = () => {
       </div>
 
       <div className="space-y-8">
-        {/* SECTION 1: ISSUE CLASSIFICATION + SOURCE */}
+        {/* SECTION 1: ISSUE CLASSIFICATION */}
         <motion.section
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -338,7 +426,7 @@ export const CreateTicket: React.FC = () => {
               </div>
             </div>
 
-            {/* New Source Field */}
+            {/* Source Field */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
@@ -362,7 +450,7 @@ export const CreateTicket: React.FC = () => {
                 <FileText size={12} /> Description / Issue Details <span className="text-red-500">*</span>
               </label>
               <textarea
-                rows={5}
+                rows={1}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Provide a detailed explanation of the issue, request, or query..."
@@ -372,7 +460,7 @@ export const CreateTicket: React.FC = () => {
           </div>
         </motion.section>
 
-        {/* SECTION 2: CUSTOMER DETAILS (unchanged) */}
+        {/* SECTION 2: CUSTOMER DETAILS (enhanced mobile field) */}
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 bg-slate-50/30 flex items-center gap-2">
             <User size={16} className="text-orange-500" />
@@ -398,14 +486,44 @@ export const CreateTicket: React.FC = () => {
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                   <Phone size={12} /> Mobile Number <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="tel"
-                  value={customerMobile}
-                  onChange={(e) => setCustomerMobile(e.target.value)}
-                  placeholder="10-digit mobile number"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500/20"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type="tel"
+                    value={customerMobile}
+                    onChange={(e) => setCustomerMobile(e.target.value)}
+                    placeholder="10-digit mobile number"
+                    className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:ring-2 transition-all pr-10 ${
+                      fetchingOrder 
+                        ? 'border-orange-400 ring-2 ring-orange-500/20' 
+                        : orderSearched && orderFound === false 
+                          ? 'border-red-400 ring-2 ring-red-500/20' 
+                          : 'border-slate-200 focus:ring-orange-500/20'
+                    }`}
+                    required
+                  />
+                  {fetchingOrder && (
+                    <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-orange-500 animate-spin" />
+                  )}
+                  {!fetchingOrder && orderSearched && orderFound === false && (
+                    <AlertCircle size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
+                  )}
+                </div>
+                {/* Status messages */}
+                {fetchingOrder && (
+                  <p className="text-[10px] text-orange-600 flex items-center gap-1 mt-1">
+                    <Loader2 size={10} className="animate-spin" /> Searching order...
+                  </p>
+                )}
+                {!fetchingOrder && orderSearched && orderFound === false && (
+                  <p className="text-[10px] text-red-600 flex items-center gap-1 mt-1">
+                    <AlertCircle size={10} /> No order found – please enter details manually
+                  </p>
+                )}
+                {!fetchingOrder && orderSearched && orderFound === true && (
+                  <p className="text-[10px] text-emerald-600 flex items-center gap-1 mt-1">
+                    <CheckCircle2 size={10} /> Order details auto‑filled
+                  </p>
+                )}
               </div>
               <div className="space-y-1.5 md:col-span-2">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
@@ -423,7 +541,7 @@ export const CreateTicket: React.FC = () => {
           </div>
         </section>
 
-        {/* SECTION 3: ORDER DETAILS (unchanged) */}
+        {/* SECTION 3: ORDER DETAILS */}
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 bg-slate-50/30 flex items-center gap-2">
             <Package size={16} className="text-orange-500" />
@@ -459,10 +577,10 @@ export const CreateTicket: React.FC = () => {
                   <Box size={12} /> Item Description
                 </label>
                 <textarea
-                  rows={2}
+                  rows={5}
                   value={itemDescription}
                   onChange={(e) => setItemDescription(e.target.value)}
-                  placeholder="Product name, SKU, quantity, etc."
+                  placeholder="Product details will be auto‑filled after entering mobile number..."
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm resize-none focus:ring-2 focus:ring-orange-500/20"
                 />
               </div>
@@ -491,7 +609,7 @@ export const CreateTicket: React.FC = () => {
           </div>
         </section>
 
-        {/* SECTION 4: SERVICE ADDRESS (unchanged) */}
+        {/* SECTION 4: SERVICE ADDRESS */}
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 bg-slate-50/30 flex items-center gap-2">
             <MapPin size={16} className="text-orange-500" />
@@ -545,7 +663,7 @@ export const CreateTicket: React.FC = () => {
           </div>
         </section>
 
-        {/* SECTION 5: ASSIGNMENT TO STORE (unchanged) */}
+        {/* SECTION 5: ASSIGNMENT TO STORE */}
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 bg-slate-50/30 flex items-center gap-2">
             <Store size={16} className="text-orange-500" />
@@ -591,7 +709,7 @@ export const CreateTicket: React.FC = () => {
           </motion.div>
         )}
 
-        {/* CREATE TICKET BUTTON AT BOTTOM */}
+        {/* CREATE TICKET BUTTON */}
         <div className="flex justify-end pt-4 border-t border-slate-200">
           <button
             type="submit"

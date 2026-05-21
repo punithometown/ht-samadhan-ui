@@ -39,7 +39,7 @@ interface Ticket {
   };
 }
 
-export const Tickets: React.FC = () => {
+export const WarehouseCrfList: React.FC = () => {
   const navigate = useNavigate();
 
   const [showFilters, setShowFilters] = useState(false);
@@ -83,7 +83,7 @@ export const Tickets: React.FC = () => {
           if (!siteId) {
             throw new Error('Site ID missing for non‑HO user.');
           }
-          apiUrl += `?siteId=${encodeURIComponent(siteId)}`;
+          apiUrl += `?type=${encodeURIComponent('CRF')}`;
         }
 
         // 3. Fetch tickets
