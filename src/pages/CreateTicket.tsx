@@ -54,7 +54,7 @@ const TICKET_TYPES = ["Complaint", "Request", "Query", "CRF"];
 const SOURCE_OPTIONS = ["WEB_APP", "MOBILE_APP", "EMAIL", "WHATSAPP", "CALL_CENTER", "STORE"];
 
 // ----------------------------------------------------------------------
-// Article type returned from API (array of these objects)
+// Article type returned from API (array of these object)
 // ----------------------------------------------------------------------
 interface ArticleItem {
   article?: string;
