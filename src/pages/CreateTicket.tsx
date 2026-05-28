@@ -1,10 +1,9 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Send, Layers, Tag, Store, Package, Calendar,
   FileText, CheckCircle2, Loader2, User, Phone, Mail,
-  UserCircle, MapPin, Building, IndianRupee, Box, Globe, AlertCircle, Search
+  UserCircle, MapPin, Building, IndianRupee, Box, Globe, AlertCircle, ChevronDown, X
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -51,8 +50,202 @@ const TICKET_CLASSIFICATION: Record<string, Record<string, string[]>> = {
   }
 };
 
-const TICKET_TYPES = ["Complaint", "Request", "Query", "CRF", "Installation"];
+const TICKET_TYPES = ["Complaint", "Request", "Query", "CRF"];
 const SOURCE_OPTIONS = ["WEB_APP", "MOBILE_APP", "EMAIL", "WHATSAPP", "CALL_CENTER", "STORE"];
+
+// ----------------------------------------------------------------------
+// Article type returned from API (array of these objects)
+// ----------------------------------------------------------------------
+interface ArticleItem {
+  article?: string;
+  description?: string;
+  billedQuantity?: number;
+  mcName?: string;
+  lob?: string;
+  newLob?: string;
+  salesDocument?: string;
+  billingDocument?: string;
+  productHierarchy?: string;
+  grossSales?: number;
+  soldToParty?: string;
+  street2?: string;
+  street3?: string;
+  customerAddress?: string;
+  city1?: string;
+  postalCode?: string;
+  billingDate?: string;
+  [key: string]: unknown;
+}
+
+// Build a human-readable label for an article item
+function articleLabel(item: ArticleItem): string {
+  const parts: string[] = [];
+  if (item.article) parts.push(item.article);
+  if (item.description) parts.push(item.description);
+  if (item.billedQuantity !== undefined) parts.push(`Qty: ${item.billedQuantity}`);
+  return parts.join(' – ') || 'Unknown Article';
+}
+
+// Build full detail string for a selected article
+function articleDetail(item: ArticleItem): string {
+  const parts: string[] = [];
+  if (item.article) parts.push(`Article: ${item.article}`);
+  if (item.description) parts.push(`Description: ${item.description}`);
+  if (item.billedQuantity !== undefined) parts.push(`Qty: ${item.billedQuantity}`);
+  if (item.mcName) parts.push(`MC: ${item.mcName}`);
+  if (item.lob) parts.push(`LOB: ${item.lob}${item.newLob ? ' / ' + item.newLob : ''}`);
+  if (item.salesDocument) parts.push(`Order: ${item.salesDocument}`);
+  if (item.billingDocument) parts.push(`Invoice: ${item.billingDocument}`);
+  if (item.productHierarchy) parts.push(`Hierarchy: ${item.productHierarchy}`);
+  if (item.billingDate) parts.push(`Billing Date: ${item.billingDate}`);
+
+  return parts.join('\n');
+}
+
+// ----------------------------------------------------------------------
+// ArticleMultiSelect – dropdown with checkboxes
+// ----------------------------------------------------------------------
+interface ArticleMultiSelectProps {
+  articles: ArticleItem[];
+  selectedIndices: number[];
+  onChange: (indices: number[]) => void;
+}
+
+const ArticleMultiSelect: React.FC<ArticleMultiSelectProps> = ({ articles, selectedIndices, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggle = (idx: number) => {
+    if (selectedIndices.includes(idx)) {
+      onChange(selectedIndices.filter(i => i !== idx));
+    } else {
+      onChange([...selectedIndices, idx]);
+    }
+  };
+
+  const selectAll = () => onChange(articles.map((_, i) => i));
+  const clearAll = () => onChange([]);
+
+  const label =
+    selectedIndices.length === 0
+      ? 'Select articles...'
+      : selectedIndices.length === articles.length
+        ? `All ${articles.length} articles selected`
+        : `${selectedIndices.length} of ${articles.length} selected`;
+
+  return (
+    <div ref={ref} className="relative w-full">
+      {/* Trigger */}
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-left flex items-center justify-between gap-2 focus:ring-2 focus:ring-orange-500/20 hover:border-orange-300 transition-all"
+      >
+        <span className={selectedIndices.length === 0 ? 'text-slate-400' : 'text-slate-700 font-medium'}>
+          {label}
+        </span>
+        <ChevronDown
+          size={16}
+          className={`text-slate-400 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+          {/* Actions row */}
+          <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            <span>{articles.length} articles found</span>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={selectAll}
+                className="text-orange-600 hover:text-orange-700 transition-colors"
+              >
+                Select All
+              </button>
+              <button
+                type="button"
+                onClick={clearAll}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          {/* Article list */}
+          <div className="max-h-60 overflow-y-auto divide-y divide-slate-50">
+            
+            {articles.map((item, idx) => {
+              const checked = selectedIndices.includes(idx);
+              return (
+                <label
+                  key={idx}
+                  className={`flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-orange-50/60 transition-colors ${checked ? 'bg-orange-50/40' : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggle(idx)}
+                    className="mt-0.5 accent-orange-500 shrink-0"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-1200 truncate">{articleLabel(item)}</p>
+                    <div className="flex flex-wrap gap-x-3 mt-0.5">
+                      {item.lob && (
+                        <span className="text-[10px] text-slate-1200">LOB: {item.lob}</span>
+                      )}
+                      {item.billingDocument && (
+                        <span className="text-[10px] text-slate-1200">Invoice: {item.billingDocument}</span>
+                      )}
+                      {/* {item.grossSales !== undefined && (
+                        <span className="text-[10px] text-slate-1200">₹{item.grossSales}</span>
+                      )} */}
+                       {item.billingDate !== undefined && (
+                        <span className="text-[10px] text-slate-4800">Billing Date: {item.billingDate}</span>
+                      )}
+                    </div>
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Selected chips */}
+      {selectedIndices.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {selectedIndices.map(idx => (
+            <span
+              key={idx}
+              className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 text-[11px] font-medium px-2.5 py-1 rounded-full"
+            >
+              {articles[idx]?.article || `Article ${idx + 1}`}
+              <button
+                type="button"
+                onClick={() => toggle(idx)}
+                className="hover:text-orange-900 transition-colors"
+              >
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ----------------------------------------------------------------------
 // MAIN COMPONENT
@@ -61,7 +254,6 @@ export const CreateTicket: React.FC = () => {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
 
-  // Store list fetched from /api/users
   interface StoreUser {
     _id: string;
     name: string;
@@ -87,12 +279,16 @@ export const CreateTicket: React.FC = () => {
   const [assignedSiteId, setAssignedSiteId] = useState("");
   const [assignedStoreName, setAssignedStoreName] = useState("");
 
-  // Order Details (extended)
+  // Order Details
   const [orderId, setOrderId] = useState("");
   const [orderAmount, setOrderAmount] = useState("");
   const [itemDescription, setItemDescription] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [purchaseDate, setPurchaseDate] = useState("");
+
+  // Articles fetched from API
+  const [fetchedArticles, setFetchedArticles] = useState<ArticleItem[]>([]);
+  const [selectedArticleIndices, setSelectedArticleIndices] = useState<number[]>([]);
 
   // Service Address
   const [addressLine, setAddressLine] = useState("");
@@ -107,28 +303,39 @@ export const CreateTicket: React.FC = () => {
 
   // Order fetching states
   const [fetchingOrder, setFetchingOrder] = useState(false);
-  const [orderFound, setOrderFound] = useState<boolean | null>(null); // null = not searched yet
+  const [orderFound, setOrderFound] = useState<boolean | null>(null);
   const [orderSearched, setOrderSearched] = useState(false);
 
-  // Helper to retrieve logged-in user from localStorage
   const getUserFromLocalStorage = () => {
     try {
       const raw = localStorage.getItem("hometown_user");
-      if (!raw) {
-        console.warn("No hometown_user found in localStorage");
-        return null;
-      }
+      if (!raw) return null;
       return JSON.parse(raw);
-    } catch (err) {
-      console.error("Failed to parse hometown_user from localStorage", err);
+    } catch {
       return null;
     }
   };
 
-  // ----- Fetch order details by mobile number -----
+  // Build itemDescription from selected articles
+  useEffect(() => {
+    if (fetchedArticles.length === 0) return;
+    if (selectedArticleIndices.length === 0) {
+      setItemDescription('');
+      return;
+    }
+    const combined = selectedArticleIndices
+      .map(idx => articleDetail(fetchedArticles[idx]))
+      .join('\n\n---\n\n');
+    setItemDescription(combined);
+  }, [selectedArticleIndices, fetchedArticles]);
+
+  // Fetch order details
   const fetchOrderDetails = async (mobile: string) => {
     setFetchingOrder(true);
     setOrderSearched(true);
+    // Reset articles on new search
+    setFetchedArticles([]);
+    setSelectedArticleIndices([]);
     try {
       const response = await fetch(`${API_BASE_URL}/spare-part-requests/order-details`, {
         method: 'POST',
@@ -136,43 +343,35 @@ export const CreateTicket: React.FC = () => {
         body: JSON.stringify({ id: mobile }),
       });
       const result = await response.json();
+
       if (result.success && result.data) {
-        const data = result.data;
+        // Support both array and single-object response
+        const rawData: ArticleItem[] = Array.isArray(result.data) ? result.data : [result.data];
 
-        // Order fields
-        setOrderId(data.salesDocument || '');
-        setOrderAmount(data.grossSales ? String(data.grossSales) : '');
-        setInvoiceNumber(data.billingDocument || '');
+        setFetchedArticles(rawData);
 
-        // Build comprehensive product detail string
-        const detailParts = [];
-        if (data.article) detailParts.push(`Article: ${data.article}`);
-        if (data.description) detailParts.push(`Description: ${data.description}`);
-        if (data.billedQuantity !== undefined) detailParts.push(`Qty: ${data.billedQuantity}`);
-        if (data.mcName) detailParts.push(`MC: ${data.mcName}`);
-        if (data.lob) detailParts.push(`LOB: ${data.lob}${data.newLob ? ' / ' + data.newLob : ''}`);
-        if (data.salesDocument) detailParts.push(`Order: ${data.salesDocument}`);
-        if (data.billingDocument) detailParts.push(`Invoice: ${data.billingDocument}`);
-        if (data.productHierarchy) detailParts.push(`Hierarchy: ${data.productHierarchy}`);
-        setItemDescription(detailParts.join('\n'));
+        // Use first item for order-level fields
+        const first = rawData[0];
+        setOrderId(first.salesDocument || '');
+        setOrderAmount(first.grossSales ? String(first.grossSales) : '');
+        setInvoiceNumber(first.billingDocument || '');
 
-        // Customer name – only fill if currently empty
-        if (!customerName.trim() && data.soldToParty) {
-          setCustomerName(data.soldToParty);
+        // Customer name
+        if (!customerName.trim() && first.soldToParty) {
+          setCustomerName(first.soldToParty);
         }
 
-        // Service Address
+        // Service address from first item
         let addr = '';
-        if (data.street2) addr += data.street2;
-        if (data.street3) addr += (addr ? ', ' : '') + data.street3;
-        if (!addr && data.customerAddress) addr = data.customerAddress;
+        if (first.street2) addr += first.street2;
+        if (first.street3) addr += (addr ? ', ' : '') + first.street3;
+        if (!addr && first.customerAddress) addr = first.customerAddress;
         setAddressLine(addr);
-        setCity(data.city1 || '');
-        setPincode(data.postalCode || '');
+        setCity(first.city1 || '');
+        setPincode(first.postalCode || '');
 
         setOrderFound(true);
       } else {
-        // No data found – reset order fields to empty so user can fill manually
         setOrderId('');
         setOrderAmount('');
         setItemDescription('');
@@ -185,7 +384,6 @@ export const CreateTicket: React.FC = () => {
     } catch (error) {
       console.error('Failed to fetch order details:', error);
       setOrderFound(false);
-      // On error also reset fields
       setOrderId('');
       setOrderAmount('');
       setItemDescription('');
@@ -198,39 +396,36 @@ export const CreateTicket: React.FC = () => {
     }
   };
 
-  // Auto‑fetch when a 10‑digit mobile number is entered
   useEffect(() => {
     if (customerMobile.length === 10) {
       fetchOrderDetails(customerMobile);
     } else {
-      // Reset search state when number changes
       setOrderFound(null);
       setOrderSearched(false);
+      setFetchedArticles([]);
+      setSelectedArticleIndices([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customerMobile]);
 
-  const availableCategories = TICKET_CLASSIFICATION[selectedType] ? Object.keys(TICKET_CLASSIFICATION[selectedType]) : [];
-  const availableSubcategories = selectedCategory ? TICKET_CLASSIFICATION[selectedType]?.[selectedCategory] || [] : [];
+  const availableCategories = TICKET_CLASSIFICATION[selectedType]
+    ? Object.keys(TICKET_CLASSIFICATION[selectedType])
+    : [];
+  const availableSubcategories = selectedCategory
+    ? TICKET_CLASSIFICATION[selectedType]?.[selectedCategory] || []
+    : [];
 
-  // Fetch stores
   useEffect(() => {
     const fetchStores = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/users`);
         const data = await response.json();
-
         if (data.success && Array.isArray(data.data)) {
-          const filteredStores = data.data.filter(
-            (user: any) => user.role === "SERVICE_MANAGER"
-          );
-          setStores(filteredStores);
+          setStores(data.data.filter((u: any) => u.role === "SERVICE_MANAGER"));
         } else {
-          console.warn("Unexpected API response format, using fallback");
           setStores([]);
         }
-      } catch (error) {
-        console.error("Error fetching stores:", error);
+      } catch {
         setStores([]);
       } finally {
         setLoadingStores(false);
@@ -262,11 +457,11 @@ export const CreateTicket: React.FC = () => {
       setSubmitting(false);
       return;
     }
-    if (!description.trim()) {
-      alert('Please enter a description');
-      setSubmitting(false);
-      return;
-    }
+    // if (!description.trim()) {
+    //   alert('Please enter a description');
+    //   setSubmitting(false);
+    //   return;
+    // }
     if (!assignedSiteId) {
       alert('Please assign a store');
       setSubmitting(false);
@@ -288,10 +483,6 @@ export const CreateTicket: React.FC = () => {
     const createdById = userData?.id || "";
     const createdBystore = userData?.location || userData?.storeName || "";
 
-    if (!createdBy || !createdById || !createdBystore) {
-      console.warn("Missing user data from localStorage. Ticket will be created without full creator info.");
-    }
-
     const payload = {
       type: selectedType,
       category: selectedCategory,
@@ -301,10 +492,7 @@ export const CreateTicket: React.FC = () => {
       source,
       site: assignedStoreName,
       siteCode: assignedSiteId,
-      assignedStore: {
-        id: assignedSiteId,
-        name: assignedStoreName,
-      },
+      assignedStore: { id: assignedSiteId, name: assignedStoreName },
       customerMobile,
       customerEmail,
       customerName,
@@ -427,7 +615,7 @@ export const CreateTicket: React.FC = () => {
             </div>
 
             {/* Source Field */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                   <Globe size={12} /> Source / Channel
@@ -442,25 +630,11 @@ export const CreateTicket: React.FC = () => {
                   ))}
                 </select>
               </div>
-            </div>
-
-            {/* Description */}
-            {/* <div className="space-y-2">
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                <FileText size={12} /> Description / Issue Details <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                rows={1}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Provide a detailed explanation of the issue, request, or query..."
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm resize-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 outline-none"
-              />
             </div> */}
           </div>
         </motion.section>
 
-
+        {/* SEARCH ORDER BY MOBILE */}
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 bg-slate-50/30 flex items-center gap-2">
             <User size={16} className="text-orange-500" />
@@ -468,7 +642,6 @@ export const CreateTicket: React.FC = () => {
             <span className="text-[10px] text-red-500">*Required</span>
           </div>
           <div className="p-6 space-y-5">
-            {/* First Row – Mobile Number */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                 <Phone size={15} /> Mobile Number <span className="text-red-500">*</span>
@@ -479,12 +652,13 @@ export const CreateTicket: React.FC = () => {
                   value={customerMobile}
                   onChange={(e) => setCustomerMobile(e.target.value)}
                   placeholder="10-digit mobile number"
-                  className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:ring-2 transition-all pr-10 ${fetchingOrder
+                  className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:ring-2 transition-all pr-10 ${
+                    fetchingOrder
                       ? 'border-orange-400 ring-2 ring-orange-500/20'
                       : orderSearched && orderFound === false
                         ? 'border-red-400 ring-2 ring-red-500/20'
                         : 'border-slate-200 focus:ring-orange-500/20'
-                    }`}
+                  }`}
                   required
                 />
                 {fetchingOrder && (
@@ -495,7 +669,6 @@ export const CreateTicket: React.FC = () => {
                 )}
               </div>
 
-              {/* 10-second progress bar while fetching */}
               {fetchingOrder && (
                 <div className="mt-2 space-y-1">
                   <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
@@ -506,7 +679,6 @@ export const CreateTicket: React.FC = () => {
                   </p>
                 </div>
               )}
-
               {!fetchingOrder && orderSearched && orderFound === false && (
                 <p className="text-[10px] text-red-600 flex items-center gap-1 mt-1">
                   <AlertCircle size={10} /> No order found – please enter details manually
@@ -514,13 +686,13 @@ export const CreateTicket: React.FC = () => {
               )}
               {!fetchingOrder && orderSearched && orderFound === true && (
                 <p className="text-[10px] text-emerald-600 flex items-center gap-1 mt-1">
-                  <CheckCircle2 size={10} /> Order details auto‑filled
+                  <CheckCircle2 size={10} /> {fetchedArticles.length} article{fetchedArticles.length !== 1 ? 's' : ''} found – select below
                 </p>
               )}
             </div>
 
-            {/* Second Row – Description */}
-            <div className="space-y-2">
+            {/* Description */}
+            {/* <div className="space-y-2">
               <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                 <FileText size={12} /> Description <span className="text-red-500">*</span>
               </label>
@@ -531,11 +703,11 @@ export const CreateTicket: React.FC = () => {
                 placeholder="Provide a detailed explanation of the issue, request, or query..."
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm resize-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 outline-none"
               />
-            </div>
+            </div> */}
           </div>
         </section>
 
-        {/* SECTION 2: CUSTOMER DETAILS (enhanced mobile field) */}
+        {/* SECTION 2: CUSTOMER DETAILS */}
         <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 bg-slate-50/30 flex items-center gap-2">
             <User size={16} className="text-orange-500" />
@@ -567,12 +739,13 @@ export const CreateTicket: React.FC = () => {
                     value={customerMobile}
                     onChange={(e) => setCustomerMobile(e.target.value)}
                     placeholder="10-digit mobile number"
-                    className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:ring-2 transition-all pr-10 ${fetchingOrder
-                      ? 'border-orange-400 ring-2 ring-orange-500/20'
-                      : orderSearched && orderFound === false
-                        ? 'border-red-400 ring-2 ring-red-500/20'
-                        : 'border-slate-200 focus:ring-orange-500/20'
-                      }`}
+                    className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:ring-2 transition-all pr-10 ${
+                      fetchingOrder
+                        ? 'border-orange-400 ring-2 ring-orange-500/20'
+                        : orderSearched && orderFound === false
+                          ? 'border-red-400 ring-2 ring-red-500/20'
+                          : 'border-slate-200 focus:ring-orange-500/20'
+                    }`}
                     required
                   />
                   {fetchingOrder && (
@@ -582,7 +755,6 @@ export const CreateTicket: React.FC = () => {
                     <AlertCircle size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-red-400" />
                   )}
                 </div>
-                {/* Status messages */}
                 {fetchingOrder && (
                   <p className="text-[10px] text-orange-600 flex items-center gap-1 mt-1">
                     <Loader2 size={10} className="animate-spin" /> Searching order...
@@ -633,7 +805,7 @@ export const CreateTicket: React.FC = () => {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500/20"
                 />
               </div>
-              <div className="space-y-1.5">
+              {/* <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                   <IndianRupee size={12} /> Order Amount
                 </label>
@@ -645,20 +817,8 @@ export const CreateTicket: React.FC = () => {
                   placeholder="0.00"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500/20"
                 />
-              </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                  <Box size={12} /> Item Description
-                </label>
-                <textarea
-                  rows={5}
-                  value={itemDescription}
-                  onChange={(e) => setItemDescription(e.target.value)}
-                  placeholder="Product details will be auto‑filled after entering mobile number..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm resize-none focus:ring-2 focus:ring-orange-500/20"
-                />
-              </div>
-              <div className="space-y-1.5">
+              </div> */}
+               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Invoice Number</label>
                 <input
                   type="text"
@@ -668,7 +828,58 @@ export const CreateTicket: React.FC = () => {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
                 />
               </div>
-              <div className="space-y-1.5">
+
+              {/* ---- ARTICLE MULTI-SELECT (shown when articles are available) ---- */}
+              {fetchedArticles.length > 0 && (
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                    <Box size={12} /> Select Articles
+                    <span className="ml-1 bg-orange-100 text-orange-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      {fetchedArticles.length} found
+                    </span>
+                  </label>
+                  <ArticleMultiSelect
+                    articles={fetchedArticles}
+                    selectedIndices={selectedArticleIndices}
+                    onChange={setSelectedArticleIndices}
+                  />
+                </div>
+              )}
+
+              {/* ---- ITEM DESCRIPTION (auto-filled from selected articles, still editable) ---- */}
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  <Box size={12} /> Item Description
+                  {selectedArticleIndices.length > 0 && (
+                    <span className="text-[10px] text-emerald-600 font-normal ml-1 flex items-center gap-0.5">
+                      <CheckCircle2 size={10} /> Auto-filled from {selectedArticleIndices.length} article{selectedArticleIndices.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </label>
+                <textarea
+                  rows={fetchedArticles.length > 0 ? 8 : 5}
+                  value={itemDescription}
+                  onChange={(e) => setItemDescription(e.target.value)}
+                  placeholder={
+                    fetchedArticles.length > 0
+                      ? 'Select articles above to auto-fill, or type manually...'
+                      : 'Product details will be auto‑filled after entering mobile number...'
+                  }
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm resize-none focus:ring-2 focus:ring-orange-500/20 font-mono"
+                />
+              </div>
+
+              {/* <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Invoice Number</label>
+                <input
+                  type="text"
+                  value={invoiceNumber}
+                  onChange={(e) => setInvoiceNumber(e.target.value)}
+                  placeholder="INV-XXX"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
+                />
+              </div> */}
+              {/* <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                   <Calendar size={12} /> Purchase Date
                 </label>
@@ -678,7 +889,7 @@ export const CreateTicket: React.FC = () => {
                   onChange={(e) => setPurchaseDate(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
                 />
-              </div>
+              </div> */}
             </div>
           </div>
         </section>
