@@ -540,9 +540,9 @@ export const TicketDetail: React.FC = () => {
               </h3>
             </div>
             <div className="p-8">
-              {/* <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-6 rounded-2xl border border-slate-100">
+              <p className="text-sm text-slate-700 leading-relaxed bg-slate-50 p-6 rounded-2xl border border-slate-100">
                 {ticket.description}
-              </p> */}
+              </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-12">
                 <div>

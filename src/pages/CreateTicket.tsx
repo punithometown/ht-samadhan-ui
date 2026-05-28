@@ -185,7 +185,7 @@ const ArticleMultiSelect: React.FC<ArticleMultiSelectProps> = ({ articles, selec
 
           {/* Article list */}
           <div className="max-h-60 overflow-y-auto divide-y divide-slate-50">
-            
+
             {articles.map((item, idx) => {
               const checked = selectedIndices.includes(idx);
               return (
@@ -211,7 +211,7 @@ const ArticleMultiSelect: React.FC<ArticleMultiSelectProps> = ({ articles, selec
                       {/* {item.grossSales !== undefined && (
                         <span className="text-[10px] text-slate-1200">₹{item.grossSales}</span>
                       )} */}
-                       {item.billingDate !== undefined && (
+                      {item.billingDate !== undefined && (
                         <span className="text-[10px] text-slate-4800">Billing Date: {item.billingDate}</span>
                       )}
                     </div>
@@ -457,11 +457,11 @@ export const CreateTicket: React.FC = () => {
       setSubmitting(false);
       return;
     }
-    // if (!description.trim()) {
-    //   alert('Please enter a description');
-    //   setSubmitting(false);
-    //   return;
-    // }
+    if (!description.trim()) {
+      alert('Please enter a description');
+      setSubmitting(false);
+      return;
+    }
     if (!assignedSiteId) {
       alert('Please assign a store');
       setSubmitting(false);
@@ -652,13 +652,12 @@ export const CreateTicket: React.FC = () => {
                   value={customerMobile}
                   onChange={(e) => setCustomerMobile(e.target.value)}
                   placeholder="10-digit mobile number"
-                  className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:ring-2 transition-all pr-10 ${
-                    fetchingOrder
-                      ? 'border-orange-400 ring-2 ring-orange-500/20'
-                      : orderSearched && orderFound === false
-                        ? 'border-red-400 ring-2 ring-red-500/20'
-                        : 'border-slate-200 focus:ring-orange-500/20'
-                  }`}
+                  className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:ring-2 transition-all pr-10 ${fetchingOrder
+                    ? 'border-orange-400 ring-2 ring-orange-500/20'
+                    : orderSearched && orderFound === false
+                      ? 'border-red-400 ring-2 ring-red-500/20'
+                      : 'border-slate-200 focus:ring-orange-500/20'
+                    }`}
                   required
                 />
                 {fetchingOrder && (
@@ -739,13 +738,12 @@ export const CreateTicket: React.FC = () => {
                     value={customerMobile}
                     onChange={(e) => setCustomerMobile(e.target.value)}
                     placeholder="10-digit mobile number"
-                    className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:ring-2 transition-all pr-10 ${
-                      fetchingOrder
-                        ? 'border-orange-400 ring-2 ring-orange-500/20'
-                        : orderSearched && orderFound === false
-                          ? 'border-red-400 ring-2 ring-red-500/20'
-                          : 'border-slate-200 focus:ring-orange-500/20'
-                    }`}
+                    className={`w-full bg-slate-50 border rounded-xl px-4 py-2.5 text-sm focus:ring-2 transition-all pr-10 ${fetchingOrder
+                      ? 'border-orange-400 ring-2 ring-orange-500/20'
+                      : orderSearched && orderFound === false
+                        ? 'border-red-400 ring-2 ring-red-500/20'
+                        : 'border-slate-200 focus:ring-orange-500/20'
+                      }`}
                     required
                   />
                   {fetchingOrder && (
@@ -805,20 +803,8 @@ export const CreateTicket: React.FC = () => {
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500/20"
                 />
               </div>
-              {/* <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                  <IndianRupee size={12} /> Order Amount
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={orderAmount}
-                  onChange={(e) => setOrderAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-orange-500/20"
-                />
-              </div> */}
-               <div className="space-y-1.5">
+             
+              <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Invoice Number</label>
                 <input
                   type="text"
@@ -869,29 +855,24 @@ export const CreateTicket: React.FC = () => {
                 />
               </div>
 
-              {/* <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Invoice Number</label>
-                <input
-                  type="text"
-                  value={invoiceNumber}
-                  onChange={(e) => setInvoiceNumber(e.target.value)}
-                  placeholder="INV-XXX"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
-                />
-              </div> */}
-              {/* <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                  <Calendar size={12} /> Purchase Date
-                </label>
-                <input
-                  type="date"
-                  value={purchaseDate}
-                  onChange={(e) => setPurchaseDate(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm"
-                />
-              </div> */}
+          
             </div>
           </div>
+
+          <div className="space-y-5.5 md:col-span-2 my-4  rounded-2xl p-5 bg-white shadow-sm">           
+             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <FileText size={10} /> Description <span className="text-red-500">*</span>
+            </label>
+
+            <textarea
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Provide a detailed explanation of the issue, request, or query..."
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm resize-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300"
+            />
+          </div>
+
         </section>
 
         {/* SECTION 4: SERVICE ADDRESS */}
