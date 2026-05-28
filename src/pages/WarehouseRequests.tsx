@@ -125,6 +125,7 @@ export const WarehouseRequests: React.FC = () => {
   const updateStatus = async (id: string, newStatus: SparePartRequest['status']) => {
     setUpdating(true);
     try {
+      // updating spare part request in data in ticket document for with current master status and spare part request
       const response = await fetch(`${API_BASE_URL}/spare-part-requests/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
