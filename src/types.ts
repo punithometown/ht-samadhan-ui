@@ -7,6 +7,7 @@ export enum Role {
   DELIVERY = 'DELIVERY',
   FITTER = 'FITTER',
   STORE_USER = 'STORE_USER',
+  HO_USER = 'HO_USER',
 }
 
 export interface MenuItem {
