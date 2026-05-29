@@ -20,7 +20,8 @@ const TICKET_CLASSIFICATION: Record<string, Record<string, string[]>> = {
     "Delivery Pending": ["Delivery Stock YES", "Delivery Stock NO"],
     "Hardware parts missing": ["Hardware Missing"],
     "Installation / Fitment Date elapsed": ["48 hour elapsed"],
-    "Service Request - After Warranty": ["Loose / Align / Laser / Polish", "Rusting", "Fabric - Sagging / Stitches coming out /Peel off", "Fungus / Termite", "Crack / Bend / Breakage / Peel Off", "Part Not Working"]
+    "Service Request - After Warranty": ["Loose / Align / Laser / Polish", "Rusting", "Fabric - Sagging / Stitches coming out /Peel off", "Fungus / Termite", "Crack / Bend / Breakage / Peel Off", "Part Not Working"],
+    "Service Request - Under Warranty": ["Loose / Align / Laser / Polish", "Rusting", "Fabric - Sagging / Stitches coming out /Peel off", "Fungus / Termite", "Crack / Bend / Breakage / Peel Off", "Part Not Working"]
   },
   Request: {
     BEHAVIOUR: ["Call Center Agent", "Delivery Person", "Fitter/Technician", "Store Staff", "Tips asked"],
@@ -472,6 +473,13 @@ export const CreateTicket: React.FC = () => {
       setSubmitting(false);
       return;
     }
+
+    if (!customerMobile.trim()) {
+      alert('Customer Email is required');
+      setSubmitting(false);
+      return;
+    }
+
     if (!customerName.trim()) {
       alert('Customer name is required');
       setSubmitting(false);
