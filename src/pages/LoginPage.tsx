@@ -26,6 +26,7 @@ export const LoginPage: React.FC = () => {
   }
   const roleOptions = [
     { label: 'Head Office (HO)', role: Role.ADMIN, email: 'kailash.vaishanv@praxisretail.in', description: 'National oversight, analytics, and admin', icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'CRM (HO) ', role: Role.ADMIN, email: 'kailash.vaishanv@praxisretail.in', description: 'National oversight, analytics, and admin', icon: ShieldCheck, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Store CSD', role: Role.SERVICE_MANAGER, email: 'htcsd.siliguri@praxisretail.in', description: 'Store grievance handling & ticket creation', icon: Store, color: 'text-orange-600', bg: 'bg-orange-50' },
     { label: 'Delivery Agent', role: Role.DELIVERY, email: 'munna.kumar@demo.com', description: 'On-ground dispatch & POD capture', icon: Truck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { label: 'Fitter / Installation', role: Role.FITTER, email: 'mukesh.kumar@demo.com', description: 'Technical job completion & schedules', icon: Wrench, color: 'text-rose-600', bg: 'bg-rose-50' },
