@@ -46,4 +46,11 @@ export const MENU_CONFIG: Record<Role, MenuItem[]> = {
     // { title: 'Fitter Workforce', path: '/fitters', icon: 'Users' },
     // { title: 'TAT Analysis', path: '/tat-analysis', icon: 'BarChart3' },
   ],
+  [Role.HO_USER]: [
+    { title: 'Dashboard', path: '/dashboard', icon: 'LayoutDashboard' },
+    { title: 'New Ticket', path: '/tickets/new', icon: 'PlusCircle' },
+    { title: 'All Tickets', path: '/tickets', icon: 'Ticket' },
+    // { title: 'TAT Analysis', path: '/tat-analysis', icon: 'BarChart3' },
+    // { title: 'User Management', path: '/users', icon: 'Users' },
+  ],
 };

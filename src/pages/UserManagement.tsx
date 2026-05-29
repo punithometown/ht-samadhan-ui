@@ -167,6 +167,7 @@ export const UserManagement: React.FC = () => {
     // Role filter
     if (activeTab !== 'all') {
       if (activeTab === 'Admin' && !['ADMIN', 'HO'].includes(user.role)) return false;
+      if (activeTab === 'HO User' && user.role !== 'HO_USER') return false;
       if (activeTab === 'Store' && user.role !== 'SERVICE_MANAGER') return false;
       if (activeTab === 'Logistics' && !['DELIVERY', 'WAREHOUSE'].includes(user.role)) return false;
       if (activeTab === 'Field' && user.role !== 'FITTER') return false;
@@ -232,7 +233,7 @@ export const UserManagement: React.FC = () => {
         {/* Filters and Tabs */}
         <div className="p-5 border-b border-slate-100 flex flex-col lg:flex-row items-center justify-between gap-6 bg-slate-50/30">
           <div className="flex bg-slate-200/50 p-1 rounded-xl w-full lg:w-auto overflow-x-auto no-scrollbar">
-            {['all', 'Admin', 'Store', 'Logistics', 'Field'].map((tab) => (
+            {['all', 'Admin', 'HO User','Store', 'Logistics', 'Field'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -464,6 +465,7 @@ export const UserManagement: React.FC = () => {
                       className="w-full px-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-sm focus:ring-2 focus:ring-orange-500/20 outline-none transition-all font-medium"
                     >
                       <option value="ADMIN">ADMIN</option>
+                      <option value="HO_USER">HO_USER</option>
                       <option value="STORE_USER">STORE_USER</option>
                       <option value="WAREHOUSE">WAREHOUSE</option>
                       <option value="DELIVERY">DELIVERY</option>
