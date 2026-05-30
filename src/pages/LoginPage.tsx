@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Role } from '../types';
 import { Navigate } from 'react-router-dom';
-import { Home, ShieldCheck, Truck, Wrench, Package, Store, ChevronRight, Lock, Mail, AlertCircle, Loader2 } from 'lucide-react';
+import { Home, ShieldCheck, Truck, Wrench, Package, Store, ChevronRight, Lock, Mail, AlertCircle, Loader2, FileText, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const LoginPage: React.FC = () => {
@@ -107,7 +107,7 @@ export const LoginPage: React.FC = () => {
         </div>
 
         {/* Right Side - Login Form */}
-        <div className="md:w-7/12 p-12 bg-white flex flex-col justify-center">
+        <div className="md:w-7/12 p-12 bg-white flex flex-col justify-between">
           <div className="max-w-sm mx-auto w-full">
             <div className="mb-10 text-center md:text-left">
               <h3 className="text-2xl font-black text-slate-900 mb-2">Sign In</h3>
@@ -174,22 +174,22 @@ export const LoginPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
 
-            {/* <div className="mt-12 pt-8 border-t border-slate-100">
-               <div className="flex flex-col items-center gap-4">
-                 <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
-                   Compliance Node Access
-                 </p>
-                 <div className="flex gap-6">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_Logos_NIKE.png" className="h-4 opacity-10 grayscale" alt="" />
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" className="h-4 opacity-20 grayscale" alt="" />
-                 </div>
-               </div>
-            </div> */}
+          {/* User Manual Link at bottom */}
+          <div className="mt-10 pt-6 border-t border-slate-100 flex justify-center">
+            <a
+              href="https://pub-eb7747fe84894385b91c9ab17f8776d8.r2.dev/resumes/Samadhan_Portal_User_Manual.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-slate-500 hover:text-orange-600 transition-colors group text-xs font-medium uppercase tracking-wider"
+            >
+              <FileText size={24} />
+              <span>User Manual</span>
+              <ExternalLink size={24} className="text-orange-500 " /> </a>
           </div>
         </div>
       </motion.div>
     </div>
   );
 };
-
