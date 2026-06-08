@@ -52,7 +52,7 @@ const TICKET_CLASSIFICATION: Record<string, Record<string, string[]>> = {
 };
 
 const TICKET_TYPES = ["Complaint", "Request", "Query", "CRF"];
-const SOURCE_OPTIONS = ["WEB_APP", "MOBILE_APP", "EMAIL", "WHATSAPP", "CALL_CENTER", "STORE"];
+const SOURCE_OPTIONS = ["EMAIL", "CALL", "STORE"];
 
 // ----------------------------------------------------------------------
 // Article type returned from API (array of these object)
@@ -496,7 +496,7 @@ export const CreateTicket: React.FC = () => {
       category: selectedCategory,
       subCategory: selectedSubcategory,
       description,
-      customer: "",
+      customer: customerName,
       source,
       site: assignedStoreName,
       siteCode: assignedSiteId,
@@ -623,7 +623,7 @@ export const CreateTicket: React.FC = () => {
             </div>
 
             {/* Source Field */}
-            {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                   <Globe size={12} /> Source / Channel
@@ -638,7 +638,7 @@ export const CreateTicket: React.FC = () => {
                   ))}
                 </select>
               </div>
-            </div> */}
+            </div>
           </div>
         </motion.section>
 

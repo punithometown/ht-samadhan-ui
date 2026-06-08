@@ -549,10 +549,10 @@ export const TicketDetail: React.FC = () => {
                   <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Customer Contact</h4>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold uppercase">
-                      {ticket.customerMobile.slice(-2)}
+                      {ticket.customerMobile.slice(-3)}
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-slate-800">{ticket.customerMobile}</p>
+                      <p className="text-xs font-bold text-slate-800">{ticket.customer}</p>
                       <p className="text-[10px] text-slate-600">{ticket.customerEmail}</p>
                       {ticket.customerInvoice && <p className="text-[10px] text-slate-500">Invoice: {ticket.customerInvoice}</p>}
                     </div>
