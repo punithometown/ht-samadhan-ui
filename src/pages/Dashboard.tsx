@@ -111,8 +111,11 @@ export const Dashboard: React.FC = () => {
     'FITTING_IN_PROGRESS'
   ];
   const resolvedStatuses = ['RESOLVED', 'CLOSED', 'FITTING_DONE'];
+  const inProgress = ['IN_PROGRESS'];
 
   const openCount = filteredTickets.filter(t => openStatuses.includes(t.status)).length;
+  const inprogressCount = filteredTickets.filter(t => inProgress.includes(t.status)).length;
+
   const resolvedCount = filteredTickets.filter(t => resolvedStatuses.includes(t.status)).length;
 
   // Delivery
@@ -167,6 +170,7 @@ export const Dashboard: React.FC = () => {
   // --- Admin stats cards (full list) ---
   const adminStats = [
     { label: 'Open Tickets', value: openCount, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50', desc: 'Require action' },
+    { label: 'In-Progress Tickets', value: inprogressCount, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50', desc: 'Require action' },
     { label: 'Resolved Tickets', value: resolvedCount, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', desc: 'Closed' },
     { label: 'Delivery In Progress', value: deliveryInProgress, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50', desc: 'On road' },
     { label: 'Delivery Done', value: deliveryDone, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50', desc: 'Completed' },

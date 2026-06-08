@@ -1,10 +1,17 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, MoreVertical, Plus, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Search, Filter, MoreVertical, Plus, ChevronLeft, ChevronRight, Loader2, Download, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { API_BASE_URL } from '../config/api';
 
+interface Comment {
+  _id: string;
+  comment: string;
+  commentedBy: string;
+  commentedById: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface Ticket {
   _id: string;
@@ -22,6 +29,7 @@ interface Ticket {
   customerInvoice?: string;
   createdAt: string;
   updatedAt: string;
+  comments: Comment[];
   productDetails?: {
     productName?: string;
     productCode?: string;
@@ -39,6 +47,16 @@ interface Ticket {
   };
 }
 
+interface PaginatedResponse {
+  success: boolean;
+  data: Ticket[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  message?: string;
+}
+
 export const Tickets: React.FC = () => {
   const navigate = useNavigate();
 
@@ -47,6 +65,7 @@ export const Tickets: React.FC = () => {
   const [filters, setFilters] = useState({
     store: 'All Stores',
     type: 'All Types',
+    status: 'All Statuses',
     date: ''
   });
 
@@ -54,78 +73,103 @@ export const Tickets: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch tickets from API with role‑based filtering
-  useEffect(() => {
-    const fetchTickets = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const limit = 10;
 
-        // 1. Get user data from localStorage
-        const userDataRaw = localStorage.getItem('hometown_user');
-        if (!userDataRaw) {
-          throw new Error('User session not found. Please log in again.');
-        }
+  const [exporting, setExporting] = useState(false);
+  const [showExportStoreModal, setShowExportStoreModal] = useState(false);
+  const [selectedExportStore, setSelectedExportStore] = useState('');
 
-        let userData;
-        try {
-          userData = JSON.parse(userDataRaw);
-        } catch {
-          throw new Error('Invalid user session data.');
-        }
-
-        const role = userData.role;
-        const siteId = userData.siteId;
-
-        // 2. Build API URL – if role is not HO, filter by siteId
-        let apiUrl = `${API_BASE_URL}/tickets`;
-        if (role && role.toUpperCase() !== 'ADMIN') {
-          if (!siteId) {
-            throw new Error('Site ID missing for non‑HO user.');
-          }
-          apiUrl += `?siteId=${encodeURIComponent(siteId)}`;
-        }
-
-        // 3. Fetch tickets
-        const response = await fetch(apiUrl);
-        const result = await response.json();
-
-        if (result.success && Array.isArray(result.data)) {
-          setTickets(result.data);
-        } else {
-          setError(result.message || 'Invalid response format from server.');
-        }
-      } catch (err: any) {
-        console.error('Error fetching tickets:', err);
-        setError(err.message || 'Failed to load tickets. Please check if the server is running.');
-      } finally {
-        setLoading(false);
-      }
+  const getUserContext = useCallback(() => {
+    const userDataRaw = localStorage.getItem('hometown_user');
+    if (!userDataRaw) {
+      throw new Error('User session not found. Please log in again.');
+    }
+    const userData = JSON.parse(userDataRaw);
+    return {
+      role: userData.role,
+      siteId: userData.siteId,
     };
+  }, []);
 
-    fetchTickets();
-  }, []); // Empty dependency array – runs once on mount
+  const fetchTickets = useCallback(async (page: number) => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  // Extract unique stores (sites) and types from the fetched tickets
-  const stores = ['All Stores', ...new Set(tickets.map(t => t.site).filter(Boolean))];
-  const types = ['All Types', ...new Set(tickets.map(t => t.type).filter(Boolean))];
+      const { role, siteId } = getUserContext();
 
-  // Filter tickets based on search query and filters
-  const filteredTickets = tickets.filter(ticket => {
-    const matchesSearch =
-      ticket.ticketNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticket.customerMobile.includes(searchQuery) ||
-      (ticket.customerEmail && ticket.customerEmail.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      ticket.description.toLowerCase().includes(searchQuery.toLowerCase());
+      const params = new URLSearchParams();
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
 
-    const matchesStore = filters.store === 'All Stores' || ticket.site === filters.store;
-    const matchesType = filters.type === 'All Types' || ticket.type === filters.type;
-    const matchesDate = !filters.date || ticket.createdAt.startsWith(filters.date);
+      if (role && role.toUpperCase() !== 'ADMIN') {
+        if (!siteId) throw new Error('Site ID missing for non‑HO user.');
+        params.append('siteId', siteId);
+      } else {
+        if (filters.store !== 'All Stores') {
+          params.append('store', filters.store);
+        }
+      }
 
-    return matchesSearch && matchesStore && matchesType && matchesDate;
-  });
+      if (filters.type !== 'All Types') params.append('type', filters.type);
+      if (filters.status !== 'All Statuses') params.append('status', filters.status);
+      if (filters.date) params.append('date', filters.date);
+      if (searchQuery.trim()) params.append('search', searchQuery.trim());
 
-  // Helper to format date
+      const response = await fetch(`${API_BASE_URL}/tickets?${params.toString()}`);
+      const result: PaginatedResponse = await response.json();
+
+      if (result.success && Array.isArray(result.data)) {
+        setTickets(result.data);
+        setTotalPages(result.totalPages || 1);
+        setTotalRecords(result.total || result.data.length);
+        setCurrentPage(result.page || page);
+      } else {
+        setError(result.message || 'Invalid response format from server.');
+        setTickets([]);
+        setTotalPages(1);
+        setTotalRecords(0);
+      }
+    } catch (err: any) {
+      console.error('Error fetching tickets:', err);
+      setError(err.message || 'Failed to load tickets. Please check if the server is running.');
+      setTickets([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [getUserContext, filters, searchQuery, limit]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchTickets(1);
+  }, [filters, searchQuery, fetchTickets]);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
+      fetchTickets(newPage);
+    }
+  };
+
+  const stores = useMemo(() => {
+    const uniqueStores = new Set(tickets.map(t => t.site).filter(Boolean));
+    return ['All Stores', ...Array.from(uniqueStores)];
+  }, [tickets]);
+
+  const types = useMemo(() => {
+    const uniqueTypes = new Set(tickets.map(t => t.type).filter(Boolean));
+    return ['All Types', ...Array.from(uniqueTypes)];
+  }, [tickets]);
+
+  const statusOptions = useMemo(() => {
+    const uniqueStatuses = new Set(tickets.map(t => t.status).filter(Boolean));
+    const commonStatuses = ['OPEN', 'ASSIGNED_TO_STORE_MANAGER', 'ASSIGNED_TO_FITTER', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED'];
+    commonStatuses.forEach(status => uniqueStatuses.add(status));
+    return ['All Statuses', ...Array.from(uniqueStatuses).sort()];
+  }, [tickets]);
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-IN', {
       year: 'numeric',
@@ -134,26 +178,167 @@ export const Tickets: React.FC = () => {
     });
   };
 
-  // Status badge styling
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'OPEN': return 'bg-blue-100 text-blue-600';
-      case 'ASSIGNED_TO_STORE_MANAGER': return 'bg-purple-100 text-purple-600';
-      case 'ASSIGNED_TO_FITTER': return 'bg-orange-100 text-orange-600';
       case 'IN_PROGRESS': return 'bg-yellow-100 text-yellow-600';
       case 'RESOLVED': return 'bg-green-100 text-green-600';
-      case 'CLOSED': return 'bg-gray-100 text-gray-500';
+      case 'ASSIGNED_TO_STORE_MANAGER': return 'bg-purple-100 text-purple-600';
+      case 'ASSIGNED_TO_FITTER': return 'bg-orange-100 text-orange-600';
       case 'CANCELLED': return 'bg-red-100 text-red-600';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  // Derive display name from customerMobile or email
   const getCustomerDisplay = (ticket: Ticket) => {
     return ticket.customerMobile || ticket.customerEmail || 'N/A';
   };
 
-  if (loading) {
+  // 👇 Get closed comment details (text, author, date)
+  const getLatestCommentDetails = (ticket: Ticket): { text: string; by: string; date: string } | null => {
+    if (!ticket.comments || ticket.comments.length === 0) return null;
+    const lastComment = ticket.comments[ticket.comments.length - 1];
+    return {
+      text: lastComment.comment || '—',
+      by: lastComment.commentedBy || 'Unknown',
+      date: formatDate(lastComment.createdAt)
+    };
+  };
+
+  // For CSV export – combine all info into a single string
+  const getLatestCommentForCSV = (ticket: Ticket): string => {
+    const details = getLatestCommentDetails(ticket);
+    if (!details) return '—';
+    return `${details.text} (${details.by} on ${details.date})`;
+  };
+
+  const downloadCSV = (data: Ticket[], filename: string) => {
+    if (!data.length) {
+      alert('No data to export.');
+      return;
+    }
+
+    const headers = [
+      'Ticket Number', 'Type', 'Category', 'Sub Category', 'Description', 'Status',
+      'Source', 'Site', 'Customer Mobile', 'Customer Email', 'Customer Invoice',
+      'Product Name', 'Product Code', 'Order ID', 'Invoice Number', 'Purchase Date',
+      'Service Address Line 1', 'Service Address Line 2', 'City', 'State', 'Pincode',
+      'Created At', 'Updated At', 'Latest Comment (with author and date)'
+    ];
+
+    const rows = data.map(ticket => [
+      ticket.ticketNumber || '',
+      ticket.type || '',
+      ticket.category || '',
+      ticket.subCategory || '',
+      ticket.description || '',
+      ticket.status || '',
+      ticket.source || '',
+      ticket.site || '',
+      ticket.customerMobile || '',
+      ticket.customerEmail || '',
+      ticket.customerInvoice || '',
+      ticket.productDetails?.productName || '',
+      ticket.productDetails?.productCode || '',
+      ticket.productDetails?.orderId || '',
+      ticket.productDetails?.invoiceNumber || '',
+      ticket.productDetails?.purchaseDate || '',
+      ticket.serviceAddress?.line1 || '',
+      ticket.serviceAddress?.line2 || '',
+      ticket.serviceAddress?.city || '',
+      ticket.serviceAddress?.state || '',
+      ticket.serviceAddress?.pincode || '',
+      formatDate(ticket.createdAt),
+      formatDate(ticket.updatedAt),
+      getLatestCommentForCSV(ticket)
+    ]);
+
+    const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const fetchAllForExport = async (storeFilter?: string, customFilters?: Partial<typeof filters>) => {
+    const { role, siteId } = getUserContext();
+    const params = new URLSearchParams();
+    params.append('limit', '10000');
+
+    if (role && role.toUpperCase() !== 'ADMIN') {
+      if (!siteId) throw new Error('Site ID missing for non‑HO user.');
+      params.append('siteId', siteId);
+    } else {
+      if (storeFilter && storeFilter !== 'All Stores') {
+        params.append('store', storeFilter);
+      } else if (customFilters?.store && customFilters.store !== 'All Stores') {
+        params.append('store', customFilters.store);
+      }
+    }
+
+    const typeFilter = customFilters?.type ?? filters.type;
+    const statusFilter = customFilters?.status ?? filters.status;
+    const dateFilter = customFilters?.date ?? filters.date;
+    const searchFilter = searchQuery;
+
+    if (typeFilter && typeFilter !== 'All Types') params.append('type', typeFilter);
+    if (statusFilter && statusFilter !== 'All Statuses') params.append('status', statusFilter);
+    if (dateFilter) params.append('date', dateFilter);
+    if (searchFilter?.trim()) params.append('search', searchFilter.trim());
+
+    const response = await fetch(`${API_BASE_URL}/tickets?${params.toString()}`);
+    const result = await response.json();
+    if (result.success && Array.isArray(result.data)) {
+      return result.data;
+    }
+    throw new Error(result.message || 'Failed to fetch data for export');
+  };
+
+  const handleExportAll = async () => {
+    setExporting(true);
+    try {
+      const allTickets = await fetchAllForExport(undefined);
+      downloadCSV(allTickets, `tickets_export_all_${new Date().toISOString().slice(0, 19)}.csv`);
+    } catch (err: any) {
+      alert(`Export failed: ${err.message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportStoreWise = () => {
+    const allStores = Array.from(new Set(tickets.map(t => t.site).filter(Boolean)));
+    if (allStores.length === 0) {
+      alert('No stores available for export.');
+      return;
+    }
+    setSelectedExportStore(allStores[0]);
+    setShowExportStoreModal(true);
+  };
+
+  const confirmExportStore = async () => {
+    if (!selectedExportStore) {
+      alert('Please select a store.');
+      return;
+    }
+    setExporting(true);
+    setShowExportStoreModal(false);
+    try {
+      const storeTickets = await fetchAllForExport(selectedExportStore);
+      downloadCSV(storeTickets, `tickets_${selectedExportStore.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 19)}.csv`);
+    } catch (err: any) {
+      alert(`Export failed: ${err.message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  if (loading && currentPage === 1 && tickets.length === 0) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
@@ -164,7 +349,7 @@ export const Tickets: React.FC = () => {
     );
   }
 
-  if (error) {
+  if (error && tickets.length === 0) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
         <p className="text-red-600 text-sm font-medium">{error}</p>
@@ -214,9 +399,24 @@ export const Tickets: React.FC = () => {
               >
                 <Filter size={14} /> Filter
               </button>
-              {/* <button className="flex-1 sm:flex-none px-4 py-2 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest shadow-sm hover:bg-slate-800 transition-colors">
-                Report CSV
-              </button> */}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleExportAll}
+                  disabled={exporting}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  Export All
+                </button>
+                <button
+                  onClick={handleExportStoreWise}
+                  disabled={exporting}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  Export by Store
+                </button>
+              </div>
             </div>
           </div>
 
@@ -228,7 +428,7 @@ export const Tickets: React.FC = () => {
                 exit={{ height: 0, opacity: 0 }}
                 className="overflow-hidden"
               >
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-200/50">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-4 border-t border-slate-200/50">
                   <div className="space-y-1.5">
                     <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Store / Site</label>
                     <select
@@ -247,6 +447,16 @@ export const Tickets: React.FC = () => {
                       className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-orange-500/20"
                     >
                       {types.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
+                    <select
+                      value={filters.status}
+                      onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+                      className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-orange-500/20"
+                    >
+                      {statusOptions.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1.5">
@@ -273,51 +483,76 @@ export const Tickets: React.FC = () => {
                 <th className="px-6 py-5">Description / Type</th>
                 <th className="px-6 py-5">Status</th>
                 <th className="px-6 py-5">Created</th>
+                <th className="px-6 py-5">Latest Comment</th>
                 <th className="px-6 py-5 text-center">Actions</th>
-              </tr>
+               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-slate-50">
-              {filteredTickets.map((ticket) => (
-                <tr
-                  key={ticket._id}
-                  onClick={() => navigate(`/tickets/${ticket._id}`)}
-                  className="bg-slate-100 hover:bg-slate-200 transition-colors group cursor-pointer"
-                >
-                  <td className="px-6 py-4">
-                    <span className="font-mono text-xs font-bold text-slate-900">{ticket.ticketNumber}</span>
-                  </td>
-                  <td className="px-6 py-4 text-xs">
-                    <div className="font-bold text-slate-800">{getCustomerDisplay(ticket)}</div>
-                    <div className="text-[10px] text-slate-500">{ticket.site || 'No store'}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-xs text-slate-700 truncate max-w-[200px] group-hover:text-orange-600 transition-colors">
-                      {ticket.type} / {ticket.category}
-                    </div>
-                    <div className="text-[9px] text-slate-500 font-medium">{ticket.description.length > 60 ? ticket.description.substring(0, 60) + '...' : ticket.description}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${getStatusColor(ticket.status)}`}>
-                      {ticket.status.replace(/_/g, ' ')}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-tighter italic">
-                    {formatDate(ticket.createdAt)}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    <button className="p-1.5 hover:bg-white rounded border border-transparent hover:border-slate-200 text-slate-400 hover:text-orange-500 transition-all shadow-sm">
-                      <MoreVertical size={14} />
-                    </button>
+              {loading && tickets.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-12">
+                    <Loader2 className="w-6 h-6 animate-spin text-orange-500 mx-auto" />
                   </td>
                 </tr>
-              ))}
-              {filteredTickets.length === 0 && (
+              ) : tickets.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-slate-500 text-sm bg-slate-100">
+                  <td colSpan={7} className="text-center py-12 text-slate-500 text-sm bg-slate-100">
                     No tickets found matching your criteria.
                   </td>
                 </tr>
+              ) : (
+                tickets.map((ticket) => {
+                  const commentDetails = getLatestCommentDetails(ticket);
+                  return (
+                    <tr
+                      key={ticket._id}
+                      onClick={() => navigate(`/tickets/${ticket._id}`)}
+                      className="bg-slate-100 hover:bg-slate-200 transition-colors group cursor-pointer"
+                    >
+                      <td className="px-6 py-4">
+                        <span className="font-mono text-xs font-bold text-slate-900">{ticket.ticketNumber}</span>
+                      </td>
+                      <td className="px-6 py-4 text-xs">
+                        <div className="font-bold text-slate-800">{getCustomerDisplay(ticket)}</div>
+                        <div className="text-[10px] text-slate-500">{ticket.site || 'No store'}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-xs text-slate-700 truncate max-w-[200px] group-hover:text-orange-600 transition-colors">
+                          {ticket.type} / {ticket.category}
+                        </div>
+                        <div className="text-[9px] text-slate-500 font-medium">
+                          {ticket.description.length > 60 ? ticket.description.substring(0, 60) + '...' : ticket.description}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${getStatusColor(ticket.status)}`}>
+                          {ticket.status.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-tighter italic">
+                        {formatDate(ticket.createdAt)}
+                      </td>
+                      {/* 👇 Enhanced Latest Comment column */}
+                      <td className="px-6 py-4 text-xs">
+                        {commentDetails ? (
+                          <div className="space-y-0.5">
+                            <div className="text-slate-700 truncate max-w-[200px]">{commentDetails.text}</div>
+                            <div className="text-[9px] text-slate-500">
+                              {commentDetails.by} • {commentDetails.date}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <button className="p-1.5 hover:bg-white rounded border border-transparent hover:border-slate-200 text-slate-400 hover:text-orange-500 transition-all shadow-sm">
+                          <MoreVertical size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -325,18 +560,68 @@ export const Tickets: React.FC = () => {
 
         <div className="p-4 border-t border-slate-200 flex items-center justify-between bg-slate-100">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-            Showing {filteredTickets.length} of {tickets.length} records
+            Showing {tickets.length} of {totalRecords} records | Page {currentPage} of {totalPages}
           </p>
           <div className="flex gap-2">
-            <button className="p-2 bg-white border border-slate-200 rounded-lg disabled:opacity-30 flex items-center justify-center" disabled>
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1 || loading}
+              className="p-2 bg-white border border-slate-200 rounded-lg disabled:opacity-30 flex items-center justify-center hover:bg-slate-50 transition-colors"
+            >
               <ChevronLeft size={14} />
             </button>
-            <button className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 flex items-center justify-center">
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages || loading}
+              className="p-2 bg-white border border-slate-200 rounded-lg disabled:opacity-30 flex items-center justify-center hover:bg-slate-50 transition-colors"
+            >
               <ChevronRight size={14} />
             </button>
           </div>
         </div>
       </div>
+
+      {showExportStoreModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-slate-900">Export Tickets by Store</h3>
+              <button onClick={() => setShowExportStoreModal(false)} className="p-1 hover:bg-slate-100 rounded">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Select Store</label>
+                <select
+                  value={selectedExportStore}
+                  onChange={(e) => setSelectedExportStore(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500/20 outline-none"
+                >
+                  {stores.filter(s => s !== 'All Stores').map(store => (
+                    <option key={store} value={store}>{store}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-3 justify-end pt-4">
+                <button
+                  onClick={() => setShowExportStoreModal(false)}
+                  className="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmExportStore}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2"
+                >
+                  {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                  Export
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
