@@ -139,15 +139,15 @@ interface Ticket {
 // ----------------------------------------------------------------------
 const STATUS_OPTIONS = [
   'OPEN',
-  'ASSIGNED_TO_STORE_MANAGER',
-  'ASSIGNED_TO_DELIVERY',
-  'ASSIGNED_TO_FITTER',
-  'VISIT_SCHEDULED',
+  // 'ASSIGNED_TO_STORE_MANAGER',
+  // 'ASSIGNED_TO_DELIVERY',
+  // 'ASSIGNED_TO_FITTER',
+  // 'VISIT_SCHEDULED',
   'IN_PROGRESS',
-  'CUSTOMER_NOT_AVAILABLE',
-  'WAITING_FOR_PARTS',
+  // 'CUSTOMER_NOT_AVAILABLE',
+  // 'WAITING_FOR_PARTS',
   'RESOLVED',
-  'CANCELLED'
+ // 'CANCELLED'
 ];
 
 const STATUS_CONFIG: Record<string, { bg: string; text: string; border: string; dot: string; label: string }> = {

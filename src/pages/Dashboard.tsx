@@ -172,19 +172,19 @@ export const Dashboard: React.FC = () => {
     { label: 'Open Tickets', value: openCount, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50', desc: 'Require action' },
     { label: 'In-Progress Tickets', value: inprogressCount, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-50', desc: 'Require action' },
     { label: 'Resolved Tickets', value: resolvedCount, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50', desc: 'Closed' },
-    { label: 'Delivery In Progress', value: deliveryInProgress, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50', desc: 'On road' },
-    { label: 'Delivery Done', value: deliveryDone, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50', desc: 'Completed' },
-    { label: 'Fitting In Progress', value: fittingInProgress, icon: Wrench, color: 'text-indigo-600', bg: 'bg-indigo-50', desc: 'Assigned' },
-    { label: 'Fitting Done', value: fittingDone, icon: CheckCircle2, color: 'text-teal-600', bg: 'bg-teal-50', desc: 'Completed' },
-    { label: 'Non‑Fitting Tickets', value: nonFitting, icon: Package, color: 'text-amber-600', bg: 'bg-amber-50', desc: 'Other types' },
-    { label: 'CRF (Installations)', value: crfTickets, icon: BarChart3, color: 'text-purple-600', bg: 'bg-purple-50', desc: 'Orders' },
+    //   { label: 'Delivery In Progress', value: deliveryInProgress, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50', desc: 'On road' },
+    //   { label: 'Delivery Done', value: deliveryDone, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50', desc: 'Completed' },
+    //   { label: 'Fitting In Progress', value: fittingInProgress, icon: Wrench, color: 'text-indigo-600', bg: 'bg-indigo-50', desc: 'Assigned' },
+    //   { label: 'Fitting Done', value: fittingDone, icon: CheckCircle2, color: 'text-teal-600', bg: 'bg-teal-50', desc: 'Completed' },
+    //   { label: 'Non‑Fitting Tickets', value: nonFitting, icon: Package, color: 'text-amber-600', bg: 'bg-amber-50', desc: 'Other types' },
+    //   { label: 'CRF (Installations)', value: crfTickets, icon: BarChart3, color: 'text-purple-600', bg: 'bg-purple-50', desc: 'Orders' },
   ];
 
   // TAT cards
   const tatCards = [
-    { label: 'Delivery TAT', value: `${deliveryTAT}h`, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50', target: 'Target ≤ 48h' },
-    { label: 'Fitting TAT', value: `${fittingTAT}h`, icon: Wrench, color: 'text-indigo-600', bg: 'bg-indigo-50', target: 'Target ≤ 72h' },
-    { label: 'Issue Tickets TAT', value: `${issueTAT}h`, icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50', target: 'Target ≤ 24h' },
+    // { label: 'Delivery TAT', value: `${deliveryTAT}h`, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50', target: 'Target ≤ 48h' },
+    // { label: 'Fitting TAT', value: `${fittingTAT}h`, icon: Wrench, color: 'text-indigo-600', bg: 'bg-indigo-50', target: 'Target ≤ 72h' },
+     { label: 'Issue Tickets TAT', value: `${issueTAT}h`, icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50', target: 'Target ≤ 24h' },
   ];
 
   // For non‑admin roles, we reuse the original role‑based stats (optional)
