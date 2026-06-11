@@ -251,7 +251,7 @@ export const Tickets: React.FC = () => {
     }
 
     const headers = [
-      'Ticket Number', 'Type', 'Category', 'Sub Category', 'Description', 'Status',
+      'Ticket Number', 'Type', 'Category', 'Sub Category', 'Description', 'Status','Duration',
       'Source', 'Site', 'Customer Mobile', 'Customer Email', 'Customer Invoice',
       'Product Name', 'Product Code', 'Order ID', 'Invoice Number', 'Purchase Date',
       'Service Address Line 1', 'Service Address Line 2', 'City', 'State', 'Pincode',
@@ -265,6 +265,7 @@ export const Tickets: React.FC = () => {
       ticket.subCategory || '',
       ticket.description || '',
       ticket.status || '',
+      getTimeElapsed(ticket.createdAt),
       ticket.source || '',
       ticket.site || '',
       ticket.customerMobile || '',
