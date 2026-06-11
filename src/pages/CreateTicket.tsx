@@ -338,7 +338,7 @@ export const CreateTicket: React.FC = () => {
     setFetchedArticles([]);
     setSelectedArticleIndices([]);
     try {
-      const response = await fetch(`${API_BASE_URL}/spare-part-requests/order-details`, {
+      const response = await fetch(`${API_BASE_URL}/order/order-details`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: mobile }),
