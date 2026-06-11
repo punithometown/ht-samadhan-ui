@@ -147,6 +147,39 @@ export const Tickets: React.FC = () => {
     fetchTickets(1);
   }, [filters, searchQuery, fetchTickets]);
 
+  // ✅ Client-side search filter
+  const filteredTickets = useMemo(() => {
+    if (!searchQuery.trim()) return tickets;
+    const q = searchQuery.toLowerCase().trim();
+    return tickets.filter(ticket => {
+      return (
+        ticket.ticketNumber?.toLowerCase().includes(q) ||
+        ticket.customerMobile?.includes(q) ||
+        ticket.customerEmail?.toLowerCase().includes(q) ||
+        ticket.description?.toLowerCase().includes(q) ||
+        ticket.site?.toLowerCase().includes(q) ||
+        ticket.category?.toLowerCase().includes(q) ||
+        ticket.subCategory?.toLowerCase().includes(q) ||
+        ticket.type?.toLowerCase().includes(q)
+      );
+    });
+  }, [tickets, searchQuery]);
+
+  // ✅ Time elapsed helper (hours / days)
+  const getTimeElapsed = (dateString: string): string => {
+    const created = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - created.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return '1 day ago';
+    if (diffDays < 30) return `${diffDays} days ago`;
+    return formatDate(dateString); // fallback to exact date for older entries
+  };
+
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
       fetchTickets(newPage);
@@ -165,9 +198,10 @@ export const Tickets: React.FC = () => {
 
   const statusOptions = useMemo(() => {
     const uniqueStatuses = new Set(tickets.map(t => t.status).filter(Boolean));
-    const commonStatuses = ['OPEN', 'ASSIGNED_TO_STORE_MANAGER', 'ASSIGNED_TO_FITTER', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED'];
-    commonStatuses.forEach(status => uniqueStatuses.add(status));
-    return ['All Statuses', ...Array.from(uniqueStatuses).sort()];
+   // const commonStatuses = ['OPEN', 'ASSIGNED_TO_STORE_MANAGER', 'ASSIGNED_TO_FITTER', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED'];
+   const commonStatuses = ['OPEN', 'IN_PROGRESS', 'LEAD_LOST','LEAD_CONVERTED','RESOLVED']; 
+   commonStatuses.forEach(status => uniqueStatuses.add(status));
+    return ['All Statuses', ...Array.from(commonStatuses).sort()];
   }, [tickets]);
 
   const formatDate = (dateString: string) => {
@@ -194,7 +228,6 @@ export const Tickets: React.FC = () => {
     return ticket.customerMobile || ticket.customerEmail || 'N/A';
   };
 
-  // 👇 Get closed comment details (text, author, date)
   const getLatestCommentDetails = (ticket: Ticket): { text: string; by: string; date: string } | null => {
     if (!ticket.comments || ticket.comments.length === 0) return null;
     const lastComment = ticket.comments[ticket.comments.length - 1];
@@ -205,7 +238,6 @@ export const Tickets: React.FC = () => {
     };
   };
 
-  // For CSV export – combine all info into a single string
   const getLatestCommentForCSV = (ticket: Ticket): string => {
     const details = getLatestCommentDetails(ticket);
     if (!details) return '—';
@@ -483,25 +515,26 @@ export const Tickets: React.FC = () => {
                 <th className="px-6 py-5">Description / Type</th>
                 <th className="px-6 py-5">Status</th>
                 <th className="px-6 py-5">Created</th>
+                <th className="px-6 py-5">Time Elapsed</th>
                 <th className="px-6 py-5">Latest Comment</th>
                 <th className="px-6 py-5 text-center">Actions</th>
-               </tr>
+              </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-slate-50">
               {loading && tickets.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12">
+                  <td colSpan={8} className="text-center py-12">
                     <Loader2 className="w-6 h-6 animate-spin text-orange-500 mx-auto" />
                   </td>
                 </tr>
-              ) : tickets.length === 0 ? (
+              ) : filteredTickets.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-slate-500 text-sm bg-slate-100">
-                    No tickets found matching your criteria.
+                  <td colSpan={8} className="text-center py-12 text-slate-500 text-sm bg-slate-100">
+                    {searchQuery.trim() ? 'No tickets match your search.' : 'No tickets found matching your criteria.'}
                   </td>
                 </tr>
               ) : (
-                tickets.map((ticket) => {
+                filteredTickets.map((ticket) => {
                   const commentDetails = getLatestCommentDetails(ticket);
                   return (
                     <tr
@@ -532,7 +565,9 @@ export const Tickets: React.FC = () => {
                       <td className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-tighter italic">
                         {formatDate(ticket.createdAt)}
                       </td>
-                      {/* 👇 Enhanced Latest Comment column */}
+                      <td className="px-6 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-tighter italic">
+                        {getTimeElapsed(ticket.createdAt)}
+                      </td>
                       <td className="px-6 py-4 text-xs">
                         {commentDetails ? (
                           <div className="space-y-0.5">
@@ -560,7 +595,10 @@ export const Tickets: React.FC = () => {
 
         <div className="p-4 border-t border-slate-200 flex items-center justify-between bg-slate-100">
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-            Showing {tickets.length} of {totalRecords} records | Page {currentPage} of {totalPages}
+            {searchQuery.trim() 
+              ? `Showing ${filteredTickets.length} of ${tickets.length} tickets on page ${currentPage} of ${totalPages}`
+              : `Showing ${filteredTickets.length} of ${totalRecords} records | Page ${currentPage} of ${totalPages}`
+            }
           </p>
           <div className="flex gap-2">
             <button
